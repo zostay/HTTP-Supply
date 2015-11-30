@@ -41,13 +41,6 @@ for @chunk-sizes -> $chunk-size {
             ok $input.defined, 'input found in environment';
     
             my $acc = buf8.new;
-            # when $input {
-            #     $input.act: -> $chunk {
-            #         $acc ~= $chunk;
-            #     };
-            #     $input.wait;
-            # }
-    
             react {
                 whenever $input -> $chunk {
                     $acc ~= $chunk;

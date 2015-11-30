@@ -210,6 +210,7 @@ sub parse-http1-request(Supply:D() $conn) returns Supply:D is export {
                     $buf          .= subbuf($i + 4);
 
                     my @headers = $header-buf.decode('iso-8859-1').split("\r\n");
+                    @headers.pop; @headers.pop;
                     my $request-line = @headers.shift;
 
                     my ($method, $uri, $http-version) = $request-line.split(' ');
