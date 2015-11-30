@@ -268,7 +268,7 @@ sub parse-http1-request(Supply:D() $conn) returns Supply:D is export {
                     }
 
                     %env<p6w.input> = supply {
-                        sub emit-with-xfer-encoding($buf) {
+                        sub emit-with-xfer-encoding($buf is rw) {
                             if my $cl = %env<CONTENT_LENGTH> {
                                 my $need-bytes = $cl - $this-length;
 

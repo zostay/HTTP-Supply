@@ -10,6 +10,7 @@ plan @chunk-sizes * 4;
 
 # Run the tests at various chunk sizes
 for @chunk-sizes -> $chunk-size {
+    warn "# chunk-size $chunk-size"; # WTF? Why does this line make this test pass?
     my $test1 = 't/data/http-1.0-close.txt'.IO;
     my $envs = parse-http1-request($test1.open(:r).Supply(:size($chunk-size), :bin));
 
@@ -46,6 +47,13 @@ for @chunk-sizes -> $chunk-size {
                     $acc ~= $chunk;
                 }
                 $input.wait;
+
+                CATCH {
+                    default { 
+                        warn $_;
+                        flunk $_;
+                    }
+                }
             }
 
             is $acc.decode('utf8'), $content, 'message body looks good';
@@ -62,6 +70,9 @@ for @chunk-sizes -> $chunk-size {
     }
 
     CATCH {
-        default { warn $_ }
+        default { 
+            warn $_;
+            flunk $_;
+        }
     }
 }
