@@ -194,7 +194,7 @@ sub parse-http1-request(Supply:D() $conn) returns Supply:D is export {
         whenever $conn -> $chunk {
             unless $closed {
                 LAST { done }
-                QUIT { $_.rethrow }
+                QUIT { .rethrow }
 
                 my $scan-start = $buf.bytes - 3 max 0;
                 $buf ~= $chunk;
@@ -206,8 +206,8 @@ sub parse-http1-request(Supply:D() $conn) returns Supply:D is export {
                     next unless $buf[$i+2] == CR;
                     next unless $buf[$i+3] == LF;
 
-                    my $header-buf = $buf.subbuf(0, $i + 3);
-                    $buf          .= subbuf($i + 3);
+                    my $header-buf = $buf.subbuf(0, $i + 4);
+                    $buf          .= subbuf($i + 4);
 
                     my @headers = $header-buf.decode('iso-8859-1').split("\r\n");
                     my $request-line = @headers.shift;
@@ -216,7 +216,6 @@ sub parse-http1-request(Supply:D() $conn) returns Supply:D is export {
 
                     # Looks HTTP-ish, but not our thing... quit now!
                     if $http-version !~~ any('HTTP/1.0', 'HTTP/1.1') {
-                        dd $http-version;
                         X::HTTP1::StreamParser::UnsupportedProtocol.new(
                             looks-httpish => True,
                             input         => supply {
@@ -268,10 +267,7 @@ sub parse-http1-request(Supply:D() $conn) returns Supply:D is export {
                     }
 
                     %env<p6w.input> = supply {
-                        emit $buf;
-                        $buf = buf8.new;
-
-                        $conn => -> $chunk {
+                        sub emit-with-xfer-encoding($buf) {
                             if my $cl = %env<CONTENT_LENGTH> {
                                 my $need-bytes = $cl - $this-length;
 
@@ -284,7 +280,7 @@ sub parse-http1-request(Supply:D() $conn) returns Supply:D is export {
                                 }
 
                                 if $need-bytes == 0 {
-                                    .done;
+                                    done;
                                 }
                             }
 
@@ -305,12 +301,20 @@ sub parse-http1-request(Supply:D() $conn) returns Supply:D is export {
                                     reason => 'client did not specify entity length',
                                 ).throw;
                             }
+                        }
+
+                        emit-with-xfer-encoding $buf;
+                        $buf = buf8.new;
+
+                        whenever $conn -> $chunk {
+                            $buf ~= $chunk;
+                            emit-with-xfer-encoding $buf;
                         };
                     };
 
                     emit %env;
 
-                    if $close { .done }
+                    if $close { done }
                 }
             }
         }

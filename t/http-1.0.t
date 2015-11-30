@@ -41,17 +41,18 @@ for @chunk-sizes -> $chunk-size {
             ok $input.defined, 'input found in environment';
     
             my $acc = buf8.new;
-            when $input {
-                $input.act: -> $chunk {
-                    $acc ~= $chunk;
-                };
-                $input.wait;
-            }
+            # when $input {
+            #     $input.act: -> $chunk {
+            #         $acc ~= $chunk;
+            #     };
+            #     $input.wait;
+            # }
     
             react {
                 whenever $input -> $chunk {
                     $acc ~= $chunk;
                 }
+                $input.wait;
             }
 
             is $acc.decode('utf8'), $content, 'message body looks good';
