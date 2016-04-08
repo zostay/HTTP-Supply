@@ -305,7 +305,6 @@ sub parse-http1-request(Supply:D() $conn) returns Supply:D is export {
                         }
 
                         emit-with-xfer-encoding $buf;
-                        $buf = buf8.new;
 
                         whenever $conn -> $chunk {
                             $buf ~= $chunk;
