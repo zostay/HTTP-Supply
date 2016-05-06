@@ -189,7 +189,7 @@ sub parse-http1-request(Supply:D() $conn) returns Supply:D is export {
         my Bool $close = False;
         my Bool $closed = False;
 
-        my $tick = Supply.interval(0.1);
+        #my $tick = Supply.interval(0.1);
 
         whenever $conn -> $chunk {
             unless $closed {
@@ -268,7 +268,7 @@ sub parse-http1-request(Supply:D() $conn) returns Supply:D is export {
                     }
 
                     %env<p6w.input> = supply {
-                        sub emit-with-xfer-encoding($buf is rw) {
+                        sub emit-with-xfer-encoding($buf is rw, Bool :$inner = False) {
                             if my $cl = %env<CONTENT_LENGTH> {
                                 my $need-bytes = $cl - $this-length;
 
@@ -280,7 +280,7 @@ sub parse-http1-request(Supply:D() $conn) returns Supply:D is export {
                                     $need-bytes -= $output-bytes;
                                 }
 
-                                if $need-bytes == 0 {
+                                if $inner and $need-bytes == 0 {
                                     done;
                                 }
                             }
@@ -308,7 +308,7 @@ sub parse-http1-request(Supply:D() $conn) returns Supply:D is export {
 
                         whenever $conn -> $chunk {
                             $buf ~= $chunk;
-                            emit-with-xfer-encoding $buf;
+                            emit-with-xfer-encoding $buf, :inner;
                         };
                     };
 

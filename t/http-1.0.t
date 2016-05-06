@@ -5,7 +5,7 @@ use Test;
 use HTTP1::StreamParser;
 
 my @chunk-sizes = 1, 3, 11, 101, 1009;
-my @tests = 
+my @tests =
     {
         source   => 'http-1.0-close.txt',
         expected => $[{
@@ -49,11 +49,11 @@ sub run-test($envs, @expected) {
 
             my $input   = %env<p6w.input> :delete;
             my $content = %exp<p6w.input> :delete;
-    
+
             is-deeply %env, %exp, 'environment looks good';
-    
+
             ok $input.defined, 'input found in environment';
-    
+
             my $acc = buf8.new;
             react {
                 whenever $input -> $chunk {
@@ -90,7 +90,7 @@ for @tests -> $test {
         run-test($envs, @expected);
 
         CATCH {
-            default { 
+            default {
                 warn $_;
                 flunk $_;
             }
