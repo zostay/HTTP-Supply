@@ -2,7 +2,7 @@
 use v6;
 
 use Test;
-use HTTP1::StreamParser;
+use HTTP::Request::Supply;
 
 my @chunk-sizes = 1, 3, 11, 101, 1009;
 my @tests =

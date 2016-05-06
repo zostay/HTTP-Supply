@@ -1,8 +1,10 @@
-unit module HTTP1::StreamParser;
+unit module HTTP::Request::Supply;
 
-=NAME HTTP1::StreamParser - A modern HTTP/1.x request parser
+=NAME HTTP::Request::Supply - A modern HTTP/1.x request parser
 
 =begin SYNOPSIS
+
+use HTTP::Request::Supply;
 
 my $listener = IO::Socket::INET.new(..., :listen);
 while my $conn = $listener.accept {
@@ -12,14 +14,14 @@ while my $conn = $listener.accept {
         ...;
 
         QUIT {
-            when X::HTTP::StreamParser::UnsupportedProtocol && .looks-httpish {
+            when X::HTTP::Request::Supply::UnsupportedProtocol && .looks-httpish {
                 $conn.print("505 HTTP Version Not Supported HTTP/1.1\r\n");
                 $conn.print("Content-Length: 26\r\n");
                 $conn.print("Content-Type: text/plain\r\n\r\n");
                 $conn.print("HTTP Version Not Supported\r\n");
             }
 
-            when X::HTTP1::StreamParser::BadRequest {
+            when X::HTTP::Request::Supply::BadRequest {
                 $conn.print("400 Bad Request HTTP/1.1\r\n");
                 $conn.print("Content-Length: " ~ .message.encode.bytes ~ \r\n");
                 $conn.print("Content-Type: text/plain\r\n\r\n");
@@ -30,7 +32,7 @@ while my $conn = $listener.accept {
             # N.B. This exception should be rarely emitted and indicates that a
             # feature is known to exist in HTTP, but this module does not yet
             # support it.
-            when X::HTTP1::StreamParser::ServerError {
+            when X::HTTP::Request::Supply::ServerError {
                 $conn.print("500 Internal Server Error HTTP/1.1\r\n");
                 $conn.print("Content-Length: " ~ .message.encode.bytes ~ \r\n");
                 $conn.print("Content-Type: text/plain\r\n\r\n");
@@ -88,7 +90,7 @@ object that will emit the body as it arrives.
 
 =head1 DIAGNOSTICS
 
-=head2 X::HTTP1::StreamParser::UnsupportedProtocol
+=head2 X::HTTP::Request::Supply::UnsupportedProtocol
 
 This exception will be thrown if the stream does not seem to be HTTP or if the
 requested HTTP version is not 1.0 or 1.1.
@@ -104,7 +106,7 @@ including the bytes already read. This allows chaining of modules similar to
 this one to handle other protocols that might happen over the web server's
 port.
 
-=head2 X::HTTP1::StreamParser::BadRequest
+=head2 X::HTTP::Request::Supply::BadRequest
 
 This exception will be thrown if the HTTP request is incorrectly framed. This
 may happen when the request does not specify its content length using a
@@ -116,7 +118,7 @@ smaller than the content length indicated. This is detected when a frame fails
 to end with a "\r\n" or when the status line is not found at the start of the
 subsequent frame.
 
-=head2 X::HTTP1::StreamParser::ServerError
+=head2 X::HTTP::Request::Supply::ServerError
 
 This exception is thrown when a feature of HTTP/1.0 or HTTP/1.1 is not
 implemented. Currently, this includes:
@@ -154,7 +156,7 @@ This software is licensed under the same terms as Perl 6.
 
 =end pod
 
-my class X::HTTP1::StreamParser::UnsupportedProtocol is Exception {
+my class X::HTTP::Request::Supply::UnsupportedProtocol is Exception {
     has Bool:D $.looks-httpish is required;
     has Supply:D $.input is required;
     method message() {
@@ -163,12 +165,12 @@ my class X::HTTP1::StreamParser::UnsupportedProtocol is Exception {
     }
 }
 
-my class X::HTTP1::StreamParser::BadRequest is Exception {
+my class X::HTTP::Request::Supply::BadRequest is Exception {
     has $.reason is required;
     method message() { $!reason }
 }
 
-my class X::HTTP1::StreamParser::ServerError is Exception {
+my class X::HTTP::Request::Supply::ServerError is Exception {
     has $.reason is required;
     method message() { $!reason }
 }
@@ -217,7 +219,7 @@ sub parse-http1-request(Supply:D() $conn) returns Supply:D is export {
 
                     # Looks HTTP-ish, but not our thing... quit now!
                     if $http-version !~~ any('HTTP/1.0', 'HTTP/1.1') {
-                        X::HTTP1::StreamParser::UnsupportedProtocol.new(
+                        X::HTTP::Request::Supply::UnsupportedProtocol.new(
                             looks-httpish => True,
                             input         => supply {
                                 emit $header-buf;
@@ -286,19 +288,19 @@ sub parse-http1-request(Supply:D() $conn) returns Supply:D is export {
                             }
 
                             elsif %env<HTTP_TRANSFER_ENCODING> eq 'chunked' {
-                                X::HTTP1::StreamParser::ServerError.new(
+                                X::HTTP::Request::Supply::ServerError.new(
                                     reason => 'Transfer-Encoding is not supported by this implementation yet',
                                 ).throw;
                             }
 
                             elsif %env<CONTENT_TYPE> ~~ /^ "multipart/byteranges" \>/ {
-                                X::HTTP1::StreamParser::ServerError.new(
+                                X::HTTP::Request::Supply::ServerError.new(
                                     reason => 'multipart/byteranges is not supported by this implementation yet',
                                 ).throw;
                             }
 
                             else {
-                                X::HTTP1::StreamParser::BadRequest.new(
+                                X::HTTP::Request::Supply::BadRequest.new(
                                     reason => 'client did not specify entity length',
                                 ).throw;
                             }
