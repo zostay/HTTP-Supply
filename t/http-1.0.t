@@ -81,7 +81,7 @@ for @tests -> $test {
     # Run the tests at various chunk sizes
     for @chunk-sizes -> $chunk-size {
         my $test-file = "t/data/$test<source>".IO;
-        my $envs = parse-http1-request(
+        my $envs = HTTP::Request::Supply.parse-http(
             $test-file.open(:r).Supply(:size($chunk-size), :bin)
         );
 

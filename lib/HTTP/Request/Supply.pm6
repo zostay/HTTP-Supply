@@ -1,50 +1,51 @@
-unit module HTTP::Request::Supply;
+unit class HTTP::Request::Supply;
 
 =NAME HTTP::Request::Supply - A modern HTTP/1.x request parser
 
 =begin SYNOPSIS
 
-use HTTP::Request::Supply;
+    use HTTP::Request::Supply;
 
-my $listener = IO::Socket::INET.new(..., :listen);
-while my $conn = $listener.accept {
-    my $envs = parse-http1-request($conn);
-    whenever $envs -> %env {
-        my $p = app(%env);
-        ...;
+    react {
+        whenever IO::Socket::Async.listen('localhost', 8080) -> $conn {
+            my $envs = HTTP::Request::Supply.parse-http($conn);
+            whenever $envs -> %env {
+                my $res = await app(%env);
+                handle-response($conn, $res);
 
-        QUIT {
-            when X::HTTP::Request::Supply::UnsupportedProtocol && .looks-httpish {
-                $conn.print("505 HTTP Version Not Supported HTTP/1.1\r\n");
-                $conn.print("Content-Length: 26\r\n");
-                $conn.print("Content-Type: text/plain\r\n\r\n");
-                $conn.print("HTTP Version Not Supported\r\n");
+                QUIT {
+                    when X::HTTP::Request::Supply::UnsupportedProtocol && .looks-httpish {
+                        $conn.print("505 HTTP Version Not Supported HTTP/1.1\r\n");
+                        $conn.print("Content-Length: 26\r\n");
+                        $conn.print("Content-Type: text/plain\r\n\r\n");
+                        $conn.print("HTTP Version Not Supported\r\n");
+                    }
+
+                    when X::HTTP::Request::Supply::BadRequest {
+                        $conn.print("400 Bad Request HTTP/1.1\r\n");
+                        $conn.print("Content-Length: " ~ .message.encode.bytes ~ \r\n");
+                        $conn.print("Content-Type: text/plain\r\n\r\n");
+                        $conn.print(.message);
+                        $conn.print("\r\n");
+                    }
+
+                    # N.B. This exception should be rarely emitted and indicates that a
+                    # feature is known to exist in HTTP, but this module does not yet
+                    # support it.
+                    when X::HTTP::Request::Supply::ServerError {
+                        $conn.print("500 Internal Server Error HTTP/1.1\r\n");
+                        $conn.print("Content-Length: " ~ .message.encode.bytes ~ \r\n");
+                        $conn.print("Content-Type: text/plain\r\n\r\n");
+                        $conn.print(.message);
+                        $conn.print("\r\n");
+                    }
+
+                    warn .message;
+                    $conn.close;
+                }
             }
-
-            when X::HTTP::Request::Supply::BadRequest {
-                $conn.print("400 Bad Request HTTP/1.1\r\n");
-                $conn.print("Content-Length: " ~ .message.encode.bytes ~ \r\n");
-                $conn.print("Content-Type: text/plain\r\n\r\n");
-                $conn.print(.message);
-                $conn.print("\r\n");
-            }
-
-            # N.B. This exception should be rarely emitted and indicates that a
-            # feature is known to exist in HTTP, but this module does not yet
-            # support it.
-            when X::HTTP::Request::Supply::ServerError {
-                $conn.print("500 Internal Server Error HTTP/1.1\r\n");
-                $conn.print("Content-Length: " ~ .message.encode.bytes ~ \r\n");
-                $conn.print("Content-Type: text/plain\r\n\r\n");
-                $conn.print(.message);
-                $conn.print("\r\n");
-            }
-
-            warn .message;
-            $conn.close;
         }
-    };
-}
+    }
 
 =end SYNOPSIS
 
@@ -53,28 +54,27 @@ while my $conn = $listener.accept {
 B<EXPERIMENTAL:> The API for this module is experimental and may change.
 
 The L<HTTP::Parser> ported from Perl 5 (and the implementation in Perl 5) is
-naïve and really only parses a single HTTP frame. That's not how the HTTP/1.1
-protocol works by default unless the C<Connection: close> header is present.
+naïve and really only parses a single HTTP frame. However, that's not how the
+HTTP/1.1 protocol typically works.
 
-This module provides the L</parse-http1-request> routine. Given a L<Supply> or
-some other object that coerces to a Supply (such as a file handle or INET
-socket), it consumes input from it. It detects the request or requests within
-the stream and passes them to the caller.
+This class provides a L<Supply> that can parses a series of requests from an
+HTTP/1.x connection. Given a L<Supply> or some other object that coerces to a
+Supply (such as a file handle or INET conn), it consumes input from it. It
+detects the request or requests within the stream and passes them to the caller.
 
-This is performed with a reactive interface. The routine returns a Supply that
-emits L<P6SGI> compatible environments for use by the caller. Any problem with
-the stream or if the stream is not being sent as legal HTTP/1.0 or HTTP/1.1,
-the stream will quit with an exception.
+This Supply emits L<P6SGI> compatible environments for use by the caller. Any
+problem with the stream or if the stream is not being sent as legal HTTP/1.0 or
+HTTP/1.1, the stream will quit with an exception.
 
 =end DESCRIPTION
 
 =begin pod
 
-=head1 EXPORTED ROUTINES
+=head1 METHODS
 
-=head2 sub parse-http1-request
+=head2 sub new
 
-    sub parse-http1-request(Supply:D() $conn) returns Supply:D
+    sub new(Supply:D() :$conn, :&promise-maker) returns Supply:D
 
 Given a L<Supply> or object that coerces to one, this will react to it whenever
 binary data is emitted. It is assumed that each chunk arriving is emitted as a
@@ -83,12 +83,28 @@ to determine the contents of the headers.
 
 Once the headers for a given frame have been read, a partial L<P6SGI> compatible
 environment is generated from the headers and emitted to the returned Supply.
-The environment will have any header given set, will set the C<REQUEST_METHOD>,
-the C<SERVER_PROTOCOL> (to either HTTP/1.1 or HTTP/1.0 as requested), and the
-C<REQUEST_URI>. It will also have the C<p6w.input> variable set to a Supply
-object that will emit the body as it arrives.
+The environment will be filled as follows:
+
+=item The C<Content-Length> will be set in C<CONTENT_LENGTH>.
+
+=item The C<Content-Type> will be set in C<CONTENT_TYPE>.
+
+=item Other headers will be set in C<HTTP_*> where the header name is converted to uppercase and dashes are replaced with underscores.
+
+=item The C<REQUEST_METHOD> will be set to the method set in the request line.
+
+=item The C<SERVER_PROTOCOL> will be set to the protocol set in the request line.
+
+=item The C<REQUEST_URI> will be set to the URI set in the request line.
+
+=item The C<p6w.input> variable will be set to a sane, on-demand L<Supply> that emits chunks of the body as C<Blob>s as they arrive.
+
+All other keys are left empty.
 
 =head1 DIAGNOSTICS
+
+The following exceptions are thrown by this class while processing input, which
+will trigger the quit handlers on the Supply.
 
 =head2 X::HTTP::Request::Supply::UnsupportedProtocol
 
@@ -131,8 +147,8 @@ implemented. Currently, this includes:
 
 This interface is built with the intention of making it easier to build HTTP/1.0
 and HTTP/1.1 parsers for use with L<P6SGI>. As of this writing, that
-specification is unfinished, so the output of this module is experiemental and
-will change as that specification changes.
+specification is only a proposed draft, so the output of this module is
+experiemental and will change as that specification changes.
 
 This implementation is not complete as fo this writing. Features like
 C<Transfer-Encoding>, C<multipart/byteranges>, and C<Connection: Keep-Alive>
@@ -150,7 +166,7 @@ Sterling Hanenkamp C<< <hanenkamp@cpan.org> >>
 
 =head1 COPYRIGHT & LICENSE
 
-Copyright 2015 Sterling Hanenkamp.
+Copyright 2016 Sterling Hanenkamp.
 
 This software is licensed under the same terms as Perl 6.
 
@@ -175,23 +191,15 @@ my class X::HTTP::Request::Supply::ServerError is Exception {
     method message() { $!reason }
 }
 
-# NewConn - starting up
-# Head - reading a message header, looking for body start
-# Body - reading the message body until end
-# Other - no more frames in this connection, read and throw away bytes
-my enum StreamState < NewConn Head Body Other >;
-
 my constant CR = 0x0d;
 my constant LF = 0x0a;
 
-sub parse-http1-request(Supply:D() $conn) returns Supply:D is export {
+method parse-http(Supply:D() $conn) returns Supply:D is export {
     supply {
         my buf8 $buf .= new;
         my $this-length = 0;
         my Bool $close = False;
         my Bool $closed = False;
-
-        #my $tick = Supply.interval(0.1);
 
         whenever $conn -> $chunk {
             unless $closed {
