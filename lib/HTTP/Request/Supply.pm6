@@ -72,9 +72,9 @@ HTTP/1.1, the stream will quit with an exception.
 
 =head1 METHODS
 
-=head2 sub new
+=head2 sub parse-http
 
-    sub new(Supply:D() :$conn, :&promise-maker) returns Supply:D
+    sub parse-http(Supply:D() :$conn, :&promise-maker) returns Supply:D
 
 Given a L<Supply> or object that coerces to one, this will react to it whenever
 binary data is emitted. It is assumed that each chunk arriving is emitted as a
@@ -194,7 +194,7 @@ my class X::HTTP::Request::Supply::ServerError is Exception {
 my constant CR = 0x0d;
 my constant LF = 0x0a;
 
-method parse-http(Supply:D() $conn) returns Supply:D is export {
+multi method parse-http(Supply:D() $conn) returns Supply:D {
     supply {
         my buf8 $buf .= new;
         my $this-length = 0;
