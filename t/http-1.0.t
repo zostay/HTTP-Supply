@@ -10,7 +10,7 @@ use HTTP::Request::Supply::Test;
 my @tests =
     {
         source   => 'http-1.0-close.txt',
-        expected => $[{
+        expected => ({
             REQUEST_METHOD     => 'POST',
             REQUEST_URI        => '/index.html',
             SERVER_PROTOCOL    => 'HTTP/1.0',
@@ -21,11 +21,11 @@ my @tests =
             HTTP_CONNECTION    => 'close',
             HTTP_USER_AGENT    => 'Mozilla/Inf',
             'p6w.input'        => 'a=1&b=2&c=3',
-        }],
+        }),
     },
     {
         source   => 'http-1.0-dumb.txt',
-        expected => $[{
+        expected => ({
             REQUEST_METHOD     => 'POST',
             REQUEST_URI        => '/index.html',
             SERVER_PROTOCOL    => 'HTTP/1.0',
@@ -35,11 +35,11 @@ my @tests =
             HTTP_REFERER       => 'http://example.com/awesome.html',
             HTTP_USER_AGENT    => 'Mozilla/Inf',
             'p6w.input'        => 'a=1&b=2&c=3',
-        }],
+        }),
     },
     {
         source   => 'http-1.0-keep-alive.txt',
-        expected => $[{
+        expected => ({
             REQUEST_METHOD     => 'POST',
             REQUEST_URI        => '/index.html',
             SERVER_PROTOCOL    => 'HTTP/1.0',
@@ -50,7 +50,7 @@ my @tests =
             HTTP_USER_AGENT    => 'Mozilla/Inf',
             HTTP_CONNECTION    => 'Keep-Alive',
             'p6w.input'        => 'a=1&b=2&c=3',
-        }],
+        }),
     },
 ;
 

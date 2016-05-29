@@ -197,7 +197,7 @@ my constant LF = 0x0a;
 multi method parse-http(Supply:D() $conn) returns Supply:D {
     supply {
         my buf8 $buf .= new;
-        my $this-length = 0;
+        my $emitted-bytes = 0;
         my Bool $close = False;
         my Bool $closed = False;
 
@@ -280,12 +280,11 @@ multi method parse-http(Supply:D() $conn) returns Supply:D {
                     %env<p6w.input> = supply {
                         sub emit-with-xfer-encoding($buf is rw, Bool :$inner = False) {
                             if my $cl = %env<CONTENT_LENGTH> {
-                                my $need-bytes = $cl - $this-length;
-
+                                my $need-bytes = $cl - $emitted-bytes;
                                 if $need-bytes > 0 && $buf.bytes > 0 {
                                     my $output-bytes = $buf.bytes min $need-bytes;
                                     emit $buf.subbuf(0, $output-bytes);
-                                    $this-length += $output-bytes;
+                                    $emitted-bytes += $output-bytes;
                                     $buf .= subbuf($output-bytes);
                                     $need-bytes -= $output-bytes;
                                 }
