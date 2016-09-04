@@ -211,10 +211,7 @@ multi method parse-http(Supply:D() $conn) returns Supply:D {
 
                 my $header-end;
                 for $scan-start .. $buf.bytes - 4 -> $i {
-                    next unless $buf[$i]   == CR;
-                    next unless $buf[$i+1] == LF;
-                    next unless $buf[$i+2] == CR;
-                    next unless $buf[$i+3] == LF;
+                    next unless $buf[$i..$i+3] ~~ (CR,LF,CR,LF);
 
                     my $header-buf = $buf.subbuf(0, $i + 4);
                     $buf          .= subbuf($i + 4);
