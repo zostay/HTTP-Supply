@@ -252,7 +252,7 @@ multi method parse-http(Supply:D() $conn) returns Supply:D {
                         my ($method, $uri, $http-version) = $request-line.split(' ');
 
                         # Looks HTTP-ish, but not our thing... quit now!
-                        if $http-version !~~ any('HTTP/1.0', 'HTTP/1.1') {
+                        if $http-version ~~ none('HTTP/1.0', 'HTTP/1.1') {
                             $other-sink = Supplier::Preserving.new;
                             $other-sink.emit($header-buf);
                             $parser-event.emit(Other);
