@@ -26,10 +26,9 @@ sub run-test($envs, @expected) is export {
                 whenever $input -> $chunk {
                     $acc ~= $chunk;
                 }
-                $input.wait;
             }
 
-            is $acc.decode('utf8'), $content, 'message body looks good';
+            is $acc.decode('UTF-8'), $content, 'message body looks good';
 
             LAST {
                 is @expected.elems, 0, 'no more requests expected';

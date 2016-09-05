@@ -197,132 +197,179 @@ my constant LF = 0x0a;
 multi method parse-http(Supply:D() $conn) returns Supply:D {
     supply {
         my buf8 $buf .= new;
-        my $emitted-bytes = 0;
+
+
+        # Shared
+        my $parser-event = Supplier::Preserving.new;
+        my enum <Header Body Closed Other DoIt>;
+        my $mode = Header;
+        my %env;
         my Bool $close = False;
-        my Bool $closed = False;
 
-        whenever $conn -> $chunk {
-            unless $closed {
-                LAST { done }
-                QUIT { .rethrow }
+        # Header mode
+        my $scan-start = 0;
 
-                my $scan-start = $buf.bytes - 3 max 0;
-                $buf ~= $chunk;
+        # Body mode
+        my $emitted-bytes = 0;
+        my Supplier $body-sink;
 
-                my $header-end;
-                for $scan-start .. $buf.bytes - 4 -> $i {
-                    next unless $buf[$i..$i+3] eqv (CR,LF,CR,LF);
+        # Other mode
+        my Supplier $other-sink;
 
-                    my $header-buf = $buf.subbuf(0, $i + 4);
-                    $buf          .= subbuf($i + 4);
+        # Closed mode
+        my Bool $has-closed = False;
 
-                    my @headers = $header-buf.decode('iso-8859-1').split("\r\n");
-                    @headers.pop; @headers.pop;
-                    my $request-line = @headers.shift;
+        whenever $parser-event.Supply -> $new-mode {
 
-                    my ($method, $uri, $http-version) = $request-line.split(' ');
+            # On mode change, reset mode
+            $mode = $new-mode unless $new-mode === DoIt;
+            if $new-mode === Header {
+                $scan-start = 0;
+            }
+            elsif $new-mode == Body {
+                $emitted-bytes = 0;
+            }
 
-                    # Looks HTTP-ish, but not our thing... quit now!
-                    if $http-version !~~ any('HTTP/1.0', 'HTTP/1.1') {
-                        X::HTTP::Request::Supply::UnsupportedProtocol.new(
-                            looks-httpish => True,
-                            input         => supply {
-                                emit $header-buf;
-                                emit $buf if $buf.bytes > 0;
+            given $mode {
+                when Closed {
+                    unless $has-closed++ {
+                        done;
+                    }
+                }
+                when Header {
+                    my $header-end;
+                    for $scan-start .. $buf.bytes - 4 -> $i {
+                        next unless $buf[$i..$i+3] eqv (CR,LF,CR,LF);
 
-                                $conn => -> $v {
-                                    emit $v;
-                                    LAST { done }
-                                    QUIT { .rethrow }
+                        # Building headers
+                        my $header-buf = $buf.subbuf(0, $i + 4);
+                        $buf          .= subbuf($i + 4);
+
+                        my @headers = $header-buf.decode('iso-8859-1').split("\r\n");
+                        @headers.pop; @headers.pop;
+                        my $request-line = @headers.shift;
+
+                        my ($method, $uri, $http-version) = $request-line.split(' ');
+
+                        # Looks HTTP-ish, but not our thing... quit now!
+                        if $http-version !~~ any('HTTP/1.0', 'HTTP/1.1') {
+                            $other-sink = Supplier::Preserving.new;
+                            $other-sink.emit($header-buf);
+                            $parser-event.emit(Other);
+
+                            X::HTTP::Request::Supply::UnsupportedProtocol.new(
+                                looks-httpish => True,
+                                input         => $other-sink.Supply,
+                            ).throw;
+
+                        }
+
+                        %env =
+                            REQUEST_METHOD  => $method,
+                            REQUEST_URI     => $uri,
+                            SERVER_PROTOCOL => $http-version,
+                            ;
+
+                        my $last-header;
+                        for @headers -> $header {
+                            if $last-header && $header ~~ /^\s+/ {
+                                $last-header.value ~= $header.trim-leading;
+                            }
+                            else {
+                                my ($name, $value) = $header.split(": ");
+                                $name.=lc.=subst('-', '_');
+                                $name = "HTTP_" ~ $name.uc;
+
+                                if %env{ $name } :exists {
+                                    %env{ $name } ~= ',', $value;
                                 }
-                            },
+                                else {
+                                    %env{ $name } = $value;
+                                }
+
+                                $last-header := %env{ $name } :p;
+                            }
+                        }
+
+                        if %env<HTTP_CONTENT_TYPE> :delete :v -> $content-type {
+                            %env<CONTENT_TYPE> = $content-type;
+                        }
+
+                        if %env<HTTP_CONTENT_LENGTH> :delete :v -> $content-length {
+                            %env<CONTENT_LENGTH> = $content-length;
+                        }
+
+                        $body-sink = Supplier::Preserving.new;
+                        %env<p6w.input> = $body-sink.Supply;
+
+                        emit %env;
+
+                        $parser-event.emit(Body);
+
+                        if $close { done }
+                    }
+
+                    $scan-start = $buf.bytes;
+                }
+                when Body {
+                    if %env<CONTENT_LENGTH> -> $content-length {
+
+                        # Do we expect more bytes?
+                        my $need-bytes = $content-length - $emitted-bytes;
+                        if $need-bytes > 0 && $buf.bytes > 0 {
+
+                            # Emit as many bytes as we can, but not more than we expect.
+                            my $output-bytes = $buf.bytes min $need-bytes;
+                            $body-sink.emit($buf.subbuf(0, $output-bytes));
+                            $emitted-bytes += $output-bytes;
+
+                            # Remove emitted bytes from buffer
+                            $buf .= subbuf($output-bytes);
+                            $need-bytes -= $output-bytes;
+                        }
+
+                        # Finish the body when we meet expectations.
+                        if $need-bytes == 0 {
+                            $body-sink.done;
+                            $parser-event.emit($close ?? Closed !! Header);
+                        }
+                    }
+
+                    elsif %env<HTTP_TRANSFER_ENCODING> eq 'chunked' {
+                        X::HTTP::Request::Supply::ServerError.new(
+                            reason => 'Transfer-Encoding is not supported by this implementation yet',
                         ).throw;
                     }
 
-                    my %env =
-                        REQUEST_METHOD  => $method,
-                        REQUEST_URI     => $uri,
-                        SERVER_PROTOCOL => $http-version,
-                        ;
-
-                    my $last-header;
-                    for @headers -> $header {
-                        if $last-header && $header ~~ /^\s+/ {
-                            $last-header.value ~= $header.trim-leading;
-                        }
-                        else {
-                            my ($name, $value) = $header.split(": ");
-                            $name.=lc.=subst('-', '_');
-                            $name = "HTTP_" ~ $name.uc;
-
-                            if %env{ $name } :exists {
-                                %env{ $name } ~= ',', $value;
-                            }
-                            else {
-                                %env{ $name } = $value;
-                            }
-
-                            $last-header := %env{ $name } :p;
-                        }
+                    elsif %env<CONTENT_TYPE> ~~ /^ "multipart/byteranges" \>/ {
+                        X::HTTP::Request::Supply::ServerError.new(
+                            reason => 'multipart/byteranges is not supported by this implementation yet',
+                        ).throw;
                     }
 
-                    if my $ct = %env<HTTP_CONTENT_TYPE> :delete :v {
-                        %env<CONTENT_TYPE> = $ct;
+                    else {
+                        X::HTTP::Request::Supply::BadRequest.new(
+                            reason => 'client did not specify entity length',
+                        ).throw;
                     }
-
-                    if my $cl = %env<HTTP_CONTENT_LENGTH> :delete :v {
-                        %env<CONTENT_LENGTH> = $cl;
-                    }
-
-                    %env<p6w.input> = supply {
-                        sub emit-with-xfer-encoding($buf is rw, Bool :$inner = False) {
-                            if my $cl = %env<CONTENT_LENGTH> {
-                                my $need-bytes = $cl - $emitted-bytes;
-                                if $need-bytes > 0 && $buf.bytes > 0 {
-                                    my $output-bytes = $buf.bytes min $need-bytes;
-                                    emit $buf.subbuf(0, $output-bytes);
-                                    $emitted-bytes += $output-bytes;
-                                    $buf .= subbuf($output-bytes);
-                                    $need-bytes -= $output-bytes;
-                                }
-
-                                if $inner and $need-bytes == 0 {
-                                    done;
-                                }
-                            }
-
-                            elsif %env<HTTP_TRANSFER_ENCODING> eq 'chunked' {
-                                X::HTTP::Request::Supply::ServerError.new(
-                                    reason => 'Transfer-Encoding is not supported by this implementation yet',
-                                ).throw;
-                            }
-
-                            elsif %env<CONTENT_TYPE> ~~ /^ "multipart/byteranges" \>/ {
-                                X::HTTP::Request::Supply::ServerError.new(
-                                    reason => 'multipart/byteranges is not supported by this implementation yet',
-                                ).throw;
-                            }
-
-                            else {
-                                X::HTTP::Request::Supply::BadRequest.new(
-                                    reason => 'client did not specify entity length',
-                                ).throw;
-                            }
-                        }
-
-                        emit-with-xfer-encoding $buf;
-
-                        whenever $conn -> $chunk {
-                            $buf ~= $chunk;
-                            emit-with-xfer-encoding $buf, :inner;
-                        };
-                    };
-
-                    emit %env;
-
-                    if $close { done }
                 }
+                when Other {
+                    $other-sink.emit($buf) if $buf.bytes > 0;
+                    $buf = buf8.new;
+                }
+                default { die "internal error" }
             }
+        }
+
+        whenever $conn -> $chunk {
+            LAST {
+                $parser-event.emit(Closed);
+            }
+            QUIT { .rethrow }
+
+            $buf ~= $chunk;
+
+            $parser-event.emit(DoIt);
         }
     }
 }
