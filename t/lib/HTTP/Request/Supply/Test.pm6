@@ -54,7 +54,7 @@ sub run-tests(@tests) is export {
                 $test-file.open(:r).Supply(:size($chunk-size), :bin)
             );
 
-            my @expected = @(%test<expected>);
+            my @expected = %test<expected>;
 
             run-test($envs, @expected);
 
