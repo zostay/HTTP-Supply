@@ -28,10 +28,10 @@ sub run-test($envs, @expected) is export {
                 }
             }
 
-            is $acc.decode('UTF-8'), $content, 'message body looks good';
+            is $acc.decode('utf8'), $content, 'message body looks good';
 
             LAST {
-                is @expected.elems, 0, 'no more requests expected';
+                is @expected.elems, 0, 'last request received, no more expected?';
             }
 
             QUIT {
@@ -45,23 +45,23 @@ sub run-test($envs, @expected) is export {
 sub run-tests(@tests) is export {
     plan @tests * @chunk-sizes * 4;
 
-    for @tests -> $test {
+    for @tests -> %test {
 
         # Run the tests at various chunk sizes
         for @chunk-sizes -> $chunk-size {
-            my $test-file = "t/data/$test<source>".IO;
+            my $test-file = "t/data/%test<source>".IO;
             my $envs = HTTP::Request::Supply.parse-http(
                 $test-file.open(:r).Supply(:size($chunk-size), :bin)
             );
 
-            my @expected = $test<expected>;
+            my @expected = @(%test<expected>);
 
             run-test($envs, @expected);
 
             CATCH {
                 default {
-                    warn $_;
-                    flunk $_;
+                    note $_;
+                    flunk "Because: " ~ $_;
                 }
             }
         }

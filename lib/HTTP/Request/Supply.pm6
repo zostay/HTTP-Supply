@@ -172,7 +172,7 @@ This software is licensed under the same terms as Perl 6.
 
 =end pod
 
-my class X::HTTP::Request::Supply::UnsupportedProtocol is Exception {
+class GLOBAL::X::HTTP::Request::Supply::UnsupportedProtocol is Exception {
     has Bool:D $.looks-httpish is required;
     has Supply:D $.input is required;
     method message() {
@@ -181,12 +181,12 @@ my class X::HTTP::Request::Supply::UnsupportedProtocol is Exception {
     }
 }
 
-my class X::HTTP::Request::Supply::BadRequest is Exception {
+class GLOBAL::X::HTTP::Request::Supply::BadRequest is Exception {
     has $.reason is required;
     method message() { $!reason }
 }
 
-my class X::HTTP::Request::Supply::ServerError is Exception {
+class GLOBAL::X::HTTP::Request::Supply::ServerError is Exception {
     has $.reason is required;
     method message() { $!reason }
 }
@@ -194,17 +194,89 @@ my class X::HTTP::Request::Supply::ServerError is Exception {
 my constant CR = 0x0d;
 my constant LF = 0x0a;
 
+my sub scan-for-header-end(:$scan-start, :$buf) {
+    for $scan-start .. $buf.bytes - 4 -> $i {
+        # note $buf[$i..$i+3].map(*.fmt("%02X")) ~ " " ~ buf8.new($buf[$i..$i+3]).decode.subst(/\r?\n/, '||', :g);
+        next unless $buf[$i..$i+3] eqv (CR,LF,CR,LF);
+        #note "BREAK";
+
+        return $i;
+    }
+
+    return -1;
+}
+
+my sub parse-header($header-buf, Bool :$include-request-line = True, :&other-sink) {
+
+    # note "[{$header-buf.decode}]";
+
+    my @headers = $header-buf.decode('iso-8859-1').split("\r\n");
+
+    my %env;
+    if $include-request-line {
+        my $request-line = @headers.shift;
+
+        my ($method, $uri, $http-version) = $request-line.split(' ');
+
+        # Looks HTTP-ish, but not our thing... quit now!
+        if $http-version ~~ none('HTTP/1.0', 'HTTP/1.1') {
+            X::HTTP::Request::Supply::UnsupportedProtocol.new(
+                looks-httpish => True,
+                input         => other-sink($header-buf),
+            ).throw;
+
+        }
+
+        %env =
+            REQUEST_METHOD  => $method,
+            REQUEST_URI     => $uri,
+            SERVER_PROTOCOL => $http-version,
+            ;
+    }
+
+    my $last-header;
+    for @headers -> $header {
+        if $last-header && $header ~~ /^\s+/ {
+            $last-header.value ~= $header.trim-leading;
+        }
+        else {
+            my ($name, $value) = $header.split(": ");
+            $name.=lc.=subst('-', '_');
+            $name = "HTTP_" ~ $name.uc;
+
+            if %env{ $name } :exists {
+                %env{ $name } ~= ',', $value;
+            }
+            else {
+                %env{ $name } = $value;
+            }
+
+            $last-header := %env{ $name } :p;
+        }
+    }
+
+    if %env<HTTP_CONTENT_TYPE> :delete :v -> $content-type {
+        %env<CONTENT_TYPE> = $content-type;
+    }
+
+    if %env<HTTP_CONTENT_LENGTH> :delete :v -> $content-length {
+        %env<CONTENT_LENGTH> = $content-length;
+    }
+
+    return %env;
+}
+
 multi method parse-http(Supply:D() $conn) returns Supply:D {
     supply {
         my buf8 $buf .= new;
 
-
         # Shared
         my $parser-event = Supplier::Preserving.new;
-        my enum <Header Body Closed Other DoIt>;
+        my enum <Header Body Closed Other Error>;
         my $mode = Header;
         my %env;
         my Bool $close = False;
+        my Bool $no-more-input = False;
 
         # Header mode
         my $scan-start = 0;
@@ -219,107 +291,88 @@ multi method parse-http(Supply:D() $conn) returns Supply:D {
         # Closed mode
         my Bool $has-closed = False;
 
-        whenever $parser-event.Supply -> $new-mode {
-
-            # On mode change, reset mode
-            $mode = $new-mode unless $new-mode === DoIt;
-            if $new-mode === Header {
-                $scan-start = 0;
-            }
-            elsif $new-mode == Body {
-                $emitted-bytes = 0;
-            }
-
+        whenever $parser-event.Supply {
             given $mode {
+                when Error {
+                    # We are in a bad state at this point, ignore any
+                    # other parser-events remaining in the queue. If we
+                    # are here, then we should have quit already.
+                }
                 when Closed {
                     unless $has-closed++ {
+                        # note "HTTP DONE";
                         done;
                     }
                 }
                 when Header {
-                    my $header-end;
-                    for $scan-start .. $buf.bytes - 4 -> $i {
-                        next unless $buf[$i..$i+3] eqv (CR,LF,CR,LF);
+                    my $header-end = scan-for-header-end(:$scan-start, :$buf);
 
-                        # Building headers
-                        my $header-buf = $buf.subbuf(0, $i + 4);
-                        $buf          .= subbuf($i + 4);
-
-                        my @headers = $header-buf.decode('iso-8859-1').split("\r\n");
-                        @headers.pop; @headers.pop;
-                        my $request-line = @headers.shift;
-
-                        my ($method, $uri, $http-version) = $request-line.split(' ');
-
-                        # Looks HTTP-ish, but not our thing... quit now!
-                        if $http-version ~~ none('HTTP/1.0', 'HTTP/1.1') {
-                            $other-sink = Supplier::Preserving.new;
-                            $other-sink.emit($header-buf);
-                            $parser-event.emit(Other);
-
-                            X::HTTP::Request::Supply::UnsupportedProtocol.new(
-                                looks-httpish => True,
-                                input         => $other-sink.Supply,
-                            ).throw;
-
-                        }
-
-                        %env =
-                            REQUEST_METHOD  => $method,
-                            REQUEST_URI     => $uri,
-                            SERVER_PROTOCOL => $http-version,
-                            ;
-
-                        my $last-header;
-                        for @headers -> $header {
-                            if $last-header && $header ~~ /^\s+/ {
-                                $last-header.value ~= $header.trim-leading;
-                            }
-                            else {
-                                my ($name, $value) = $header.split(": ");
-                                $name.=lc.=subst('-', '_');
-                                $name = "HTTP_" ~ $name.uc;
-
-                                if %env{ $name } :exists {
-                                    %env{ $name } ~= ',', $value;
-                                }
-                                else {
-                                    %env{ $name } = $value;
-                                }
-
-                                $last-header := %env{ $name } :p;
-                            }
-                        }
-
-                        if %env<HTTP_CONTENT_TYPE> :delete :v -> $content-type {
-                            %env<CONTENT_TYPE> = $content-type;
-                        }
-
-                        if %env<HTTP_CONTENT_LENGTH> :delete :v -> $content-length {
-                            %env<CONTENT_LENGTH> = $content-length;
-                        }
+                    # Found the end of headers, let's get parsing
+                    if $header-end > 0 {
+                        %env = parse-header($buf.subbuf(0, $header-end),
+                            :other-sink(-> $header-buf {
+                                $other-sink := Supplier::Preserving.new;
+                                $other-sink.emit($header-buf);
+                                $other-sink.Supply
+                            }),
+                        );
+                        $buf          .= subbuf($header-end + 4);
 
                         $body-sink = Supplier::Preserving.new;
                         %env<p6w.input> = $body-sink.Supply;
 
+                        # dd %env;
                         emit %env;
 
-                        $parser-event.emit(Body);
+                        # note "SWITCH TO BODY";
+                        $mode = Body;
+                        $emitted-bytes = 0;
+                        $parser-event.emit(True);
 
-                        if $close { done }
+                        CATCH {
+                            when X::HTTP::Request::Supply::UnsupportedProtocol {
+                                $mode = Other;
+                                $parser-event.emit(True);
+                                .rethrow;
+                            }
+                            default {
+                                $mode = Error;
+                                .rethrow;
+                            }
+                        }
                     }
 
-                    $scan-start = $buf.bytes;
+                    # Don't scan from the very start next time to save some
+                    # effort
+                    else {
+                        $scan-start = $buf.bytes;
+                    }
+
+                    # We have searched for the end of this header and
+                    # didn't find it. We are getting no more input from the
+                    # input stream, so time to give up.
+                    if $mode === Header && $no-more-input {
+                        $mode = Closed;
+                        $parser-event.emit(True);
+                    }
                 }
                 when Body {
+                    my $finished-body = False;
+
+                    # note "READING BODY";
                     if %env<CONTENT_LENGTH> -> $content-length {
+                        # note "content-length: $content-length";
 
                         # Do we expect more bytes?
                         my $need-bytes = $content-length - $emitted-bytes;
+                        # note "need-bytes = $need-bytes";
+                        # note "buf.bytes = {$buf.bytes}";
+                        # note "GOING TO OUTPUT? {$need-bytes > 0 && $buf.bytes > 0}";
                         if $need-bytes > 0 && $buf.bytes > 0 {
 
                             # Emit as many bytes as we can, but not more than we expect.
                             my $output-bytes = $buf.bytes min $need-bytes;
+                            # note "<{$buf.subbuf(0, $output-bytes).decode}>";
                             $body-sink.emit($buf.subbuf(0, $output-bytes));
                             $emitted-bytes += $output-bytes;
 
@@ -328,34 +381,148 @@ multi method parse-http(Supply:D() $conn) returns Supply:D {
                             $need-bytes -= $output-bytes;
                         }
 
-                        # Finish the body when we meet expectations.
-                        if $need-bytes == 0 {
-                            $body-sink.done;
-                            $parser-event.emit($close ?? Closed !! Header);
-                        }
+                        $finished-body = $need-bytes == 0;
                     }
 
                     elsif %env<HTTP_TRANSFER_ENCODING> eq 'chunked' {
-                        X::HTTP::Request::Supply::ServerError.new(
-                            reason => 'Transfer-Encoding is not supported by this implementation yet',
-                        ).throw;
+                        my enum <Size Chunk Trailers Done>;
+                        my $state = Size;
+                        my $size = 0;
+                        while $state !=== Done {
+                            given $state {
+                                when Size {
+                                    for 0..$buf.bytes - 2 -> $i {
+                                        next unless $buf[$i..$i+1] eqv (CR,LF);
+
+                                        $size = $buf.subbuf(0, $i);
+
+                                        # throw away extension details, if any
+                                        $size .= subst(/';' .*/, '');
+                                        $size  = :16($size);
+
+                                        $state = Size;
+                                        $buf.=subbuf($i+2);
+                                        last;
+                                    }
+                                }
+                                when Chunk {
+                                    # Last chunk, consume empty chunk and handle
+                                    # trailers
+                                    if $size == 0 {
+                                        $state = Trailers;
+                                    }
+
+                                    # Emit the current chunk, go back to look
+                                    # for size again
+                                    elsif $buf.bytes >= $size {
+                                        $body-sink.emit($buf.subbuf(0, $size));
+                                        $buf.=subbuf(0, $size+2);
+                                        $state = Size;
+                                    }
+
+                                    # We need more data, but no more is coming.
+                                    # Skip trailers and just quit.
+                                    elsif $no-more-input {
+                                        $finished-body = True;
+                                        $state = Done;
+                                    }
+
+                                    # We don't have the whole chunk yet, we'll
+                                    # come back for it later.
+                                    else {
+                                        $buf = $size.fmt("%X").encode('ascii')
+                                             ~ CR ~ LF ~ $buf;
+                                        $state = Done;
+                                    }
+                                }
+                                when Trailers {
+                                    my $header-end = scan-for-header-end(:0scan-start, :$buf);
+
+                                    # 0 or more trailing headers found, chunking
+                                    # is now complete.
+                                    if $header-end > -1 {
+                                        if $header-end > 0 {
+                                            my %trailers = parse-header(
+                                                $buf.subbuf(0, $header-end),
+                                                :!include-request-line,
+                                            );
+                                            $buf .= subbuf($header-end + 4);
+
+                                            $body-sink.emit(%trailers);
+                                        }
+
+                                        # Parse the next header
+                                        $state = Done;
+                                        $finished-body = True;
+                                    }
+
+                                    # We didn't find the end of the body, but we
+                                    # aren't receiving anymore input either, so
+                                    # it's time to quit anyway.
+                                    elsif $no-more-input {
+                                        $body-sink.done;
+                                        $state = Done;
+                                        $finished-body = True;
+                                    }
+
+                                    # Failed to find the last trailer, quit and
+                                    # come back later
+                                    else {
+                                        $buf = "0".encode('ascii')
+                                            ~ CR ~ LF ~ $buf;
+                                        $state = Done;
+                                    }
+                                }
+                            }
+                        }
                     }
 
                     elsif %env<CONTENT_TYPE> ~~ /^ "multipart/byteranges" \>/ {
-                        X::HTTP::Request::Supply::ServerError.new(
+                        $mode = Error;
+                        my $x = X::HTTP::Request::Supply::ServerError.new(
                             reason => 'multipart/byteranges is not supported by this implementation yet',
-                        ).throw;
+                        );
+                        $body-sink.quit($x);
+                        die $x;
                     }
 
                     else {
-                        X::HTTP::Request::Supply::BadRequest.new(
+                        $mode = Error;
+                        my $x = X::HTTP::Request::Supply::BadRequest.new(
                             reason => 'client did not specify entity length',
-                        ).throw;
+                        );
+                        $body-sink.quit($x);
+                        die $x;
+                    }
+
+                    # Regardless of body type we parse, we need to close the
+                    # parser or move to the next header when finished.
+
+                    # If we see that No more input is coming and we are out of
+                    # bytes to parse, we need to stop here.
+                    # note "buf.bytes = {$buf.bytes}";
+                    # note "no-more-input = {$no-more-input}";
+                    $finished-body = True
+                        if $buf.bytes == 0 && $no-more-input;
+
+                    # Finish the body when we meet expectations.
+                    if $finished-body {
+                        # note "BODY DONE";
+                        $body-sink.done;
+                        $close = True if $buf.bytes == 0 && $no-more-input;
+                        $mode = $close ?? Closed !! Header;
+                        # note "SWITCHING TO $mode";
+                        $scan-start = 0;
+                        $parser-event.emit(True);
                     }
                 }
                 when Other {
                     $other-sink.emit($buf) if $buf.bytes > 0;
                     $buf = buf8.new;
+                    if $no-more-input {
+                        # note "OTHER DONE";
+                        done;
+                    }
                 }
                 default { die "internal error" }
             }
@@ -363,13 +530,15 @@ multi method parse-http(Supply:D() $conn) returns Supply:D {
 
         whenever $conn -> $chunk {
             LAST {
-                $parser-event.emit(Closed);
+                # note "NO MORE INPUT";
+                $no-more-input++;
+                $parser-event.emit(True);
             }
             QUIT { .rethrow }
 
             $buf ~= $chunk;
 
-            $parser-event.emit(DoIt);
+            $parser-event.emit(True);
         }
     }
 }
