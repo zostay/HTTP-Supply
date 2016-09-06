@@ -58,6 +58,9 @@ my @tests =
            HTTP_REFERER       => 'http://example.com/index.html',
            HTTP_TRAILER       => 'Magic',
            'p6w.input'        => '{}{"a":1,"b":2,"c",3}',
+           'test.trailers'    => {
+               HTTP_MAGIC => 'on',
+            },
        }, {
            REQUEST_METHOD     => 'GET',
            REQUEST_URI        => 'http://example.com/main.css',
@@ -74,3 +77,4 @@ my @tests =
 
 run-tests @tests;
 
+done-testing;

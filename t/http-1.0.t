@@ -55,3 +55,5 @@ my @tests =
 ;
 
 run-tests @tests;
+
+done-testing;

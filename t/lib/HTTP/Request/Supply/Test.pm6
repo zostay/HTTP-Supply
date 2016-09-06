@@ -17,6 +17,11 @@ sub run-test($envs, @expected) is export {
             my $input   = %env<p6w.input> :delete;
             my $content = %exp<p6w.input> :delete;
 
+            my %trailers;
+            if %exp<test.trailers>:exists {
+                %trailers = %exp<test.trailers> :delete;
+            }
+
             is-deeply %env, %exp, 'environment looks good';
 
             ok $input.defined, 'input found in environment';
@@ -24,7 +29,16 @@ sub run-test($envs, @expected) is export {
             my $acc = buf8.new;
             react {
                 whenever $input -> $chunk {
-                    $acc ~= $chunk;
+                    given $chunk {
+                        when Blob { $acc ~= $chunk }
+                        when Hash {
+                            is-deeply $chunk, %trailers, 'found trailers';
+                            %trailers = ();
+                        }
+                        default {
+                            flunk 'unknown body output';
+                        }
+                    }
                 }
             }
 
@@ -32,6 +46,8 @@ sub run-test($envs, @expected) is export {
 
             LAST {
                 is @expected.elems, 0, 'last request received, no more expected?';
+                flunk 'trailers were not received'
+                    if %trailers;
             }
 
             QUIT {
@@ -43,12 +59,6 @@ sub run-test($envs, @expected) is export {
 }
 
 sub run-tests(@tests) is export {
-    my $test-number = [+] map -> %test {
-        %test<expected>.elems * 3 + 1
-    }, @tests;
-
-    plan $test-number * @chunk-sizes;
-
     for @tests -> %test {
 
         # Run the tests at various chunk sizes

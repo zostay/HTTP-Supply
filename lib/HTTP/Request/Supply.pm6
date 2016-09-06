@@ -353,6 +353,7 @@ multi method parse-http(Supply:D() $conn) returns Supply:D {
                     # didn't find it. We are getting no more input from the
                     # input stream, so time to give up.
                     if $mode === Header && $no-more-input {
+                        # note "SWITCH TO Closed";
                         $mode = Closed;
                         $parser-event.emit(True);
                     }
@@ -392,23 +393,37 @@ multi method parse-http(Supply:D() $conn) returns Supply:D {
                         my $state = Size;
                         my $size = 0;
                         while $state !=== Done {
+                            # note "state = $state";
                             given $state {
                                 when Size {
+                                    my $size-end;
                                     for 0..$buf.bytes - 2 -> $i {
                                         next unless $buf[$i..$i+1] eqv (CR,LF);
 
-                                        $size = $buf.subbuf(0, $i);
+                                        $size-end = $i;
+                                        # note "size-end = $size-end";
+                                        last;
+                                    }
+
+                                    if $size-end -> $i {
+                                        $size = $buf.subbuf(0, $i).decode('ascii');
+                                        # note "size originally = $size";
 
                                         # throw away extension details, if any
                                         $size .= subst(/';' .*/, '');
+                                        # note "size so far = $size";
                                         $size  = :16($size);
+                                        # note "size = $size";
 
-                                        $state = Size;
+                                        $state = Chunk;
                                         $buf.=subbuf($i+2);
-                                        last;
+                                        # note "buf = {$buf.decode}";
                                     }
                                 }
                                 when Chunk {
+                                    # note "Chunk size = $size";
+                                    # note "buf.bytes = {$buf.bytes}";
+                                    # note "no-more-input = $no-more-input";
                                     # Last chunk, consume empty chunk and handle
                                     # trailers
                                     if $size == 0 {
@@ -418,8 +433,9 @@ multi method parse-http(Supply:D() $conn) returns Supply:D {
                                     # Emit the current chunk, go back to look
                                     # for size again
                                     elsif $buf.bytes >= $size {
+                                        # note "emit {$buf.subbuf(0, $size).decode}";
                                         $body-sink.emit($buf.subbuf(0, $size));
-                                        $buf.=subbuf(0, $size+2);
+                                        $buf.=subbuf($size+2);
                                         $state = Size;
                                     }
 
@@ -451,6 +467,7 @@ multi method parse-http(Supply:D() $conn) returns Supply:D {
                                             );
                                             $buf .= subbuf($header-end + 4);
 
+                                            # note "body emit {%trailers.perl}";
                                             $body-sink.emit(%trailers);
                                         }
 
@@ -463,7 +480,6 @@ multi method parse-http(Supply:D() $conn) returns Supply:D {
                                     # aren't receiving anymore input either, so
                                     # it's time to quit anyway.
                                     elsif $no-more-input {
-                                        $body-sink.done;
                                         $state = Done;
                                         $finished-body = True;
                                     }
