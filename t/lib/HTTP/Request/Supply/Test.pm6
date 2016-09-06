@@ -43,7 +43,11 @@ sub run-test($envs, @expected) is export {
 }
 
 sub run-tests(@tests) is export {
-    plan @tests * @chunk-sizes * 4;
+    my $test-number = [+] map -> %test {
+        %test<expected>.elems * 3 + 1
+    }, @tests;
+
+    plan $test-number * @chunk-sizes;
 
     for @tests -> %test {
 
@@ -54,7 +58,7 @@ sub run-tests(@tests) is export {
                 $test-file.open(:r).Supply(:size($chunk-size), :bin)
             );
 
-            my @expected = %test<expected>;
+            my @expected = |%test<expected>;
 
             run-test($envs, @expected);
 

@@ -21,7 +21,7 @@ my @tests =
             HTTP_CONNECTION    => 'close',
             HTTP_USER_AGENT    => 'Mozilla/Inf',
             'p6w.input'        => 'a=1&b=2&c=3',
-        }),
+        },),
     },
     {
         source   => 'http-1.1-pipeline.txt',
@@ -46,6 +46,7 @@ my @tests =
            HTTP_TE            => 'chunked',
            HTTP_REFERER       => 'http://example.com/index.html',
            HTTP_USER_AGENT    => 'Mozilla/Inf',
+           'p6w.input'        => '',
        }, {
            REQUEST_METHOD     => 'POST',
            REQUEST_URI        => 'http://example.com/form.html',
@@ -66,6 +67,7 @@ my @tests =
            HTTP_ACCEPT        => 'text/css',
            HTTP_USER_AGENT    => 'Mozilla/Inf',
            HTTP_REFERER       => 'http://example.com/index.html',
+           'p6w.input'        => '',
         }),
     },
     ;

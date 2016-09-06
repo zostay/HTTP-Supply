@@ -309,7 +309,7 @@ multi method parse-http(Supply:D() $conn) returns Supply:D {
 
                     # Found the end of headers, let's get parsing
                     if $header-end > 0 {
-                        %env = parse-header($buf.subbuf(0, $header-end),
+                        %env := parse-header($buf.subbuf(0, $header-end),
                             :other-sink(-> $header-buf {
                                 $other-sink := Supplier::Preserving.new;
                                 $other-sink.emit($header-buf);
@@ -319,6 +319,7 @@ multi method parse-http(Supply:D() $conn) returns Supply:D {
                         $buf          .= subbuf($header-end + 4);
 
                         $body-sink = Supplier::Preserving.new;
+                        # note "body-sink = ", $body-sink.WHICH;
                         %env<p6w.input> = $body-sink.Supply;
 
                         # dd %env;
@@ -372,6 +373,7 @@ multi method parse-http(Supply:D() $conn) returns Supply:D {
 
                             # Emit as many bytes as we can, but not more than we expect.
                             my $output-bytes = $buf.bytes min $need-bytes;
+                            # note "body-sink = ", $body-sink.WHICH;
                             # note "<{$buf.subbuf(0, $output-bytes).decode}>";
                             $body-sink.emit($buf.subbuf(0, $output-bytes));
                             $emitted-bytes += $output-bytes;
@@ -382,6 +384,7 @@ multi method parse-http(Supply:D() $conn) returns Supply:D {
                         }
 
                         $finished-body = $need-bytes == 0;
+                        # note "finished-body = $finished-body";
                     }
 
                     elsif %env<HTTP_TRANSFER_ENCODING> eq 'chunked' {
@@ -507,7 +510,7 @@ multi method parse-http(Supply:D() $conn) returns Supply:D {
 
                     # Finish the body when we meet expectations.
                     if $finished-body {
-                        # note "BODY DONE";
+                        # note "BODY DONE ", $body-sink.WHICH;
                         $body-sink.done;
                         $close = True if $buf.bytes == 0 && $no-more-input;
                         $mode = $close ?? Closed !! Header;
