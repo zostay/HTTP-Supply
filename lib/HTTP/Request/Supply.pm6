@@ -54,17 +54,17 @@ unit class HTTP::Request::Supply;
 B<EXPERIMENTAL:> The API for this module is experimental and may change.
 
 The L<HTTP::Parser> ported from Perl 5 (and the implementation in Perl 5) is
-naïve and really only parses a single HTTP frame. However, that's not how the
-HTTP/1.1 protocol typically works.
+naïve and really only parses a single HTTP frame (i.e., it provides no
+keep-alive support). However, that is not how the HTTP protocol typically works
+on the modern web.
 
-This class provides a L<Supply> that can parses a series of requests from an
-HTTP/1.x connection. Given a L<Supply> or some other object that coerces to a
-Supply (such as a file handle or INET conn), it consumes input from it. It
-detects the request or requests within the stream and passes them to the caller.
+This class provides a L<Supply> that is able to parse a series of request frames
+from an HTTP/1.x connection. Given a L<Supply>, it consumes binary input from
+it. It detects the request frame or frames within the stream and passes them
+back to the tapper asynchronously as they arrive.
 
-This Supply emits L<P6SGI> compatible environments for use by the caller. Any
-problem with the stream or if the stream is not being sent as legal HTTP/1.0 or
-HTTP/1.1, the stream will quit with an exception.
+This Supply emits L<P6WAPI> compatible environments for use by the caller. If a
+problem is detected in the stream, it will quit with an exception.
 
 =end DESCRIPTION
 
@@ -76,12 +76,15 @@ HTTP/1.1, the stream will quit with an exception.
 
     sub parse-http(Supply:D() :$conn, :&promise-maker) returns Supply:D
 
-Given a L<Supply> or object that coerces to one, this will react to it whenever
-binary data is emitted. It is assumed that each chunk arriving is emitted as a
-L<Blob>. This collates the incoming chunks into HTTP frames, which are parsed
-to determine the contents of the headers.
+The given L<Supply>, C<$conn>, must emit a stream of bytes. Any other data will
+result in undefined behavior. This parser assumes binary data will be sent.
 
-Once the headers for a given frame have been read, a partial L<P6SGI> compatible
+The returned supply will react whenever data is emitted on the input supply. The
+incoming bytes are collated into HTTP frames, which are parsed to determine the
+contents of the headers. Headers are encoded into strings via ISO-8859-1 (as per
+L<RFC7230 §3.2.4|https://tools.ietf.org/html/rfc7230#section-3.2.4>).
+
+Once the headers for a given frame have been read, a partial L<P6WAPI> compatible
 environment is generated from the headers and emitted to the returned Supply.
 The environment will be filled as follows:
 
@@ -89,15 +92,19 @@ The environment will be filled as follows:
 
 =item The C<Content-Type> will be set in C<CONTENT_TYPE>.
 
-=item Other headers will be set in C<HTTP_*> where the header name is converted to uppercase and dashes are replaced with underscores.
+=item Other headers will be set in C<HTTP_*> where the header name is converted
+to uppercase and dashes are replaced with underscores.
 
 =item The C<REQUEST_METHOD> will be set to the method set in the request line.
 
-=item The C<SERVER_PROTOCOL> will be set to the protocol set in the request line.
+=item The C<SERVER_PROTOCOL> will be set to the protocol set in the request
+line.
 
 =item The C<REQUEST_URI> will be set to the URI set in the request line.
 
-=item The C<p6w.input> variable will be set to a sane, on-demand L<Supply> that emits chunks of the body as C<Blob>s as they arrive.
+=item The C<p6w.input> variable will be set to a sane L<Supply> that emits
+chunks of the body as bytes as they arrive. No attempt is made to decode these
+bytes.
 
 All other keys are left empty.
 
@@ -126,39 +133,26 @@ port.
 
 This exception will be thrown if the HTTP request is incorrectly framed. This
 may happen when the request does not specify its content length using a
-C<Content-Length> header, chunked C<Transfer-Encoding>, or a
-C<multipart/byteranges> content type.
-
-It may also happen on a subsequent frame if an earlier frame does is larger or
-smaller than the content length indicated. This is detected when a frame fails
-to end with a "\r\n" or when the status line is not found at the start of the
-subsequent frame.
+C<Content-Length> header or chunked C<Transfer-Encoding>.
 
 =head2 X::HTTP::Request::Supply::ServerError
 
-This exception is thrown when a feature of HTTP/1.0 or HTTP/1.1 is not
-implemented. Currently, this includes:
-
-=item C<Transfer-Encoding> on the request is not implemented.
-
-=item C<Content-Type: multipart/byteranges> is not implemented.
+This exception may be thrown when a feature of HTTP/1.0 or HTTP/1.1 is not
+implemented.
 
 =head1 CAVEATS
 
+HTTP is complicated and hard. This implementation is not yet complete and not
+battle tested yet. Please report bugs to github and patches are welcome.
+
 This interface is built with the intention of making it easier to build HTTP/1.0
-and HTTP/1.1 parsers for use with L<P6SGI>. As of this writing, that
+and HTTP/1.1 parsers for use with L<P6WAPI>. As of this writing, that
 specification is only a proposed draft, so the output of this module is
 experiemental and will change as that specification changes.
 
-This implementation is not complete as fo this writing. Features like
-C<Transfer-Encoding>, C<multipart/byteranges>, and C<Connection: Keep-Alive>
-are not implemented. (It is possible that the last will never be implemented
-unless there is a specific request or patch given to me to add it.)
-
-Finally, the limitation of this module is that it is only responsible for
-parsing the incoming HTTP frames. A complete server implementation must make
-sure to handle the response frames correctly for HTTP/1.0 or HTTP/1.1 as
-appropriate.
+Finally, one limitation of this module is that it is only responsible for
+parsing the incoming HTTP frames. It will not manage the connection and it
+provides no tools for sending responses back to the user agent.
 
 =head1 AUTHOR
 
