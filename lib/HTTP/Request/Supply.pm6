@@ -325,6 +325,14 @@ multi method parse-http(Supply:D() $conn) returns Supply:D {
                         # dd %env;
                         emit %env;
 
+                        my $http-connection = %env<HTTP_CONNECTION> // '';
+                        if %env<SERVER_PROTOCOL> eq 'HTTP/1.0' {
+                            $close = True if $http-connection ne 'keep-alive';
+                        }
+                        else {
+                            $close = True if $http-connection eq 'close';
+                        }
+
                         # note "SWITCH TO BODY";
                         $mode = Body;
                         $emitted-bytes = 0;
