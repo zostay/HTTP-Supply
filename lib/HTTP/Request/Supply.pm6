@@ -362,33 +362,7 @@ multi method parse-http(Supply:D() $conn) returns Supply:D {
                     my $finished-body = False;
 
                     # note "READING BODY";
-                    if %env<CONTENT_LENGTH> -> $content-length {
-                        # note "content-length: $content-length";
-
-                        # Do we expect more bytes?
-                        my $need-bytes = $content-length - $emitted-bytes;
-                        # note "need-bytes = $need-bytes";
-                        # note "buf.bytes = {$buf.bytes}";
-                        # note "GOING TO OUTPUT? {$need-bytes > 0 && $buf.bytes > 0}";
-                        if $need-bytes > 0 && $buf.bytes > 0 {
-
-                            # Emit as many bytes as we can, but not more than we expect.
-                            my $output-bytes = $buf.bytes min $need-bytes;
-                            # note "body-sink = ", $body-sink.WHICH;
-                            # note "<{$buf.subbuf(0, $output-bytes).decode}>";
-                            $body-sink.emit($buf.subbuf(0, $output-bytes));
-                            $emitted-bytes += $output-bytes;
-
-                            # Remove emitted bytes from buffer
-                            $buf .= subbuf($output-bytes);
-                            $need-bytes -= $output-bytes;
-                        }
-
-                        $finished-body = $need-bytes == 0;
-                        # note "finished-body = $finished-body";
-                    }
-
-                    elsif %env<HTTP_TRANSFER_ENCODING> eq 'chunked' {
+                    if %env<HTTP_TRANSFER_ENCODING>.defined && %env<HTTP_TRANSFER_ENCODING> eq 'chunked' {
                         my enum <Size Chunk Trailers Done>;
                         my $state = Size;
                         my $size = 0;
@@ -496,13 +470,30 @@ multi method parse-http(Supply:D() $conn) returns Supply:D {
                         }
                     }
 
-                    elsif %env<CONTENT_TYPE> ~~ /^ "multipart/byteranges" \>/ {
-                        $mode = Error;
-                        my $x = X::HTTP::Request::Supply::ServerError.new(
-                            reason => 'multipart/byteranges is not supported by this implementation yet',
-                        );
-                        $body-sink.quit($x);
-                        die $x;
+                    elsif %env<CONTENT_LENGTH> -> $content-length {
+                        # note "content-length: $content-length";
+
+                        # Do we expect more bytes?
+                        my $need-bytes = $content-length - $emitted-bytes;
+                        # note "need-bytes = $need-bytes";
+                        # note "buf.bytes = {$buf.bytes}";
+                        # note "GOING TO OUTPUT? {$need-bytes > 0 && $buf.bytes > 0}";
+                        if $need-bytes > 0 && $buf.bytes > 0 {
+
+                            # Emit as many bytes as we can, but not more than we expect.
+                            my $output-bytes = $buf.bytes min $need-bytes;
+                            # note "body-sink = ", $body-sink.WHICH;
+                            # note "<{$buf.subbuf(0, $output-bytes).decode}>";
+                            $body-sink.emit($buf.subbuf(0, $output-bytes));
+                            $emitted-bytes += $output-bytes;
+
+                            # Remove emitted bytes from buffer
+                            $buf .= subbuf($output-bytes);
+                            $need-bytes -= $output-bytes;
+                        }
+
+                        $finished-body = $need-bytes == 0;
+                        # note "finished-body = $finished-body";
                     }
 
                     else {
