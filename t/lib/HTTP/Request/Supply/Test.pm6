@@ -9,6 +9,9 @@ constant @chunk-sizes = 1, 3, 11, 101, 1009;
 
 sub run-test($envs, @expected is copy) is export {
     my @processing-envs;
+
+    # capture test results in closures for later final evaluation
+    my @output;
     react {
         whenever $envs -> %env {
             my %exp = @expected.shift;
@@ -17,8 +20,10 @@ sub run-test($envs, @expected is copy) is export {
                 default { .warn; .rethrow }
             }
 
-            flunk 'unexpected environment received: ', %env.perl
-                unless %exp.defined;
+            @output.push: {
+                flunk 'unexpected environment received: ', %env.perl
+                    unless %exp.defined;
+            };
 
             my $input   = %env<p6w.input> :delete;
             my $content = %exp<p6w.input> :delete;
@@ -28,9 +33,10 @@ sub run-test($envs, @expected is copy) is export {
                 %trailers = %exp<test.trailers> :delete;
             }
 
-            is-deeply %env, %exp, 'environment looks good';
-
-            ok $input.defined, 'input found in environment';
+            @output.push: {
+                is-deeply %env, %exp, 'environment looks good';
+                ok $input.defined, 'input found in environment';
+            };
 
             my $acc = buf8.new;
             # note "CURRENT LOADS PRE-CHUNKING = ", $*SCHEDULER.loads;
@@ -42,17 +48,24 @@ sub run-test($envs, @expected is copy) is export {
                         given $chunk {
                             when Blob { $acc ~= $chunk }
                             when Hash {
-                                is-deeply $chunk, %trailers, 'found trailers';
+                                if $chunk eqv %trailers {
+                                    @output.push: { pass 'found trailers' }
+                                }
+                                else {
+                                    @output.push: { flunk 'found trailers' }
+                                }
                                 %trailers = ();
                             }
                             default {
-                                flunk 'unknown body output';
+                                @output.push: { flunk 'unknown body output' };
                             }
                         }
 
                         LAST {
-                            is $acc.decode('utf8'), $content, 'message body looks good';
-                            flunk 'trailers were not received' if %trailers;
+                            @output.push: {
+                                is $acc.decode('utf8'), $content, 'message body looks good';
+                                flunk 'trailers were not received' if %trailers;
+                            };
                         }
                     }
                 }
@@ -61,13 +74,18 @@ sub run-test($envs, @expected is copy) is export {
 
             QUIT {
                 warn $_;
-                flunk $_;
+                @output.push: { flunk $_ };
             }
         }
     }
 
 
     await @processing-envs;
+
+    # emit test results in order, single threaded
+    for @output -> $test-ok {
+        $test-ok.();
+    }
 
     is @expected.elems, 0, 'last request received, no more expected?';
 }
