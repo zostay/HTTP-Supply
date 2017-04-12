@@ -73,7 +73,7 @@ sub run-test($envs, @expected is copy) is export {
 }
 
 sub file-reader($test-file, :$size) is export {
-    $test-file.open(:r).Supply(:$size, :bin)
+    $test-file.open(:r, :bin).Supply(:$size)
 }
 
 sub socket-reader($test-file, :$size) is export {
