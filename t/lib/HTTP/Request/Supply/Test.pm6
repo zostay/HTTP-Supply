@@ -13,6 +13,10 @@ sub run-test($envs, @expected is copy) is export {
         whenever $envs -> %env {
             my %exp = @expected.shift;
 
+            CATCH {
+                default { .warn; .rethrow }
+            }
+
             flunk 'unexpected environment received: ', %env.perl
                 unless %exp.defined;
 
