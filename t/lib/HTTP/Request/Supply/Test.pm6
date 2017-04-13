@@ -7,6 +7,22 @@ use HTTP::Request::Supply;
 constant @chunk-sizes = 1, 3, 11, 101, 1009;
 #constant @chunk-sizes = 3;
 
+
+multi await-or-timeout(Promise:D $p, Int :$seconds = 5, :$message) {
+    await Promise.anyof($p, Promise.in($seconds));
+    if $p {
+        $p.result;
+    }
+    else {
+        die "operation timed out after $seconds seconds"
+            ~ ($message ?? ": $message" !! "");
+    }
+}
+
+multi await-or-timeout(@p, Int :$seconds = 5, :$message) {
+    await-or-timeout(Promise.allof(@p), :$seconds, :$message);
+}
+
 sub run-test($envs, @expected is copy) is export {
     my @processing-envs;
 
@@ -49,10 +65,10 @@ sub run-test($envs, @expected is copy) is export {
                             when Blob { $acc ~= $chunk }
                             when Hash {
                                 if $chunk eqv %trailers {
-                                    @output.push: { pass 'found trailers' }
+                                    @output.push: { pass 'found trailers' };
                                 }
                                 else {
-                                    @output.push: { flunk 'found trailers' }
+                                    @output.push: { flunk 'found trailers' };
                                 }
                                 %trailers = ();
                             }
@@ -66,11 +82,15 @@ sub run-test($envs, @expected is copy) is export {
                                 is $acc.decode('utf8'), $content, 'message body looks good';
                                 flunk 'trailers were not received' if %trailers;
                             };
+
+                            done;
                         }
                     }
                 }
                 # note "STOP CHUNKING";
             }
+
+            LAST { done }
 
             QUIT {
                 warn $_;
@@ -80,7 +100,7 @@ sub run-test($envs, @expected is copy) is export {
     }
 
 
-    await @processing-envs;
+    await-or-timeout(@processing-envs, :message<processing test environments>);
 
     # emit test results in order, single threaded
     for @output -> $test-ok {
@@ -98,34 +118,46 @@ sub socket-reader($test-file, :$size) is export {
     my Int $port = (rand * 1000 + 10000).Int;
 
     my $listener = do {
-        # note "new listener";
+        # note "# new listener";
         my $listener = IO::Socket::Async.listen('127.0.0.1', $port);
 
         my $promised-tap = Promise.new;
-        sub close-tap { await $promised-tap.then({ .result.close }) }
+        sub close-tap {
+            await-or-timeout(
+                $promised-tap.then({ .result.close }),
+                :message<connection close>,
+            );
+        }
 
         $promised-tap.keep($listener.act: {
-            # note "accepted";
+            CATCH {
+                default { .warn; .rethrow }
+            }
+
+            # note "# accepted $*THREAD.id()";
             my $input = $test-file.open(:r, :bin);
             while $input.read($size) -> $chunk {
-                # note "write ", $chunk;
-                await .write: $chunk;
+                # note "# write ", $chunk;
+                await-or-timeout(.write($chunk), :message<writing chunk>);
             }
-            # note "closing";
+            # note "# closing";
             .close;
-            # note "closed";
+            # note "# closed";
             close-tap;
-            # note "not listening";
+            # note "# not listening";
         });
 
-        # note "ready to connect";
+        # note "# ready to connect";
         $listener;
     }
 
     # When we get here, we should be ready to connect to ourself on the other
     # thread.
-    my $conn = await IO::Socket::Async.connect('127.0.0.1', $port);
-    # note "connected ", $*THREAD.id;
+    my $conn = await-or-timeout(
+        IO::Socket::Async.connect('127.0.0.1', $port),
+        :message<client connnection>,
+    );
+    # note "# connected  $*THREAD.id()";
     $conn.Supply(:bin);
 }
 
