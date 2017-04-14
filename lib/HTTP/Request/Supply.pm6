@@ -582,6 +582,9 @@ multi method parse-http(Supply:D() $conn, Bool :$debug = False) returns Supply:D
                 .rethrow;
             }
 
+            die "The provided Supply does not emit binary data, did you forget to set :bin?"
+                unless $chunk ~~ Blob;
+
             debug "READ ", $chunk;
             $buf = $buf ~ $chunk;
 
