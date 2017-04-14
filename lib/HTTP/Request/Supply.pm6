@@ -529,6 +529,11 @@ multi method parse-http(Supply:D() $conn, Bool :$debug = False) returns Supply:D
                         debug "finished-body = $finished-body";
                     }
 
+                    elsif %env<REQUEST_METHOD> eq 'GET' | 'HEAD' | 'TRACE' {
+                        $finished-body = True;
+                        debug "%env<REQUEST_METHOD> request with no entity";
+                    }
+
                     else {
                         $mode = Error;
                         my $x = X::HTTP::Request::Supply::BadRequest.new(
