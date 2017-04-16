@@ -534,18 +534,11 @@ multi method parse-http(Supply:D() $conn, Bool :$debug = False) returns Supply:D
                         debug "finished-body = $finished-body";
                     }
 
-                    elsif %env<REQUEST_METHOD> eq 'GET' | 'HEAD' | 'TRACE' {
-                        $finished-body = True;
-                        debug "%env<REQUEST_METHOD> request with no entity";
-                    }
-
+                    # No indication of length at all, assume CL=0
                     else {
-                        $mode = Error;
-                        my $x = X::HTTP::Request::Supply::BadRequest.new(
-                            reason => 'client did not specify entity length',
-                        );
-                        $body-sink.quit($x);
-                        die $x;
+                        %env<CONTENT_LENGTH> = 0;
+                        $finished-body = True;
+                        debug "request with no entity";
                     }
 
                     # Regardless of body type we parse, we need to close the
