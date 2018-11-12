@@ -74,9 +74,9 @@ The returned supply will react whenever data is emitted on the input supply. The
 
 Once the headers for a given frame have been read, a partial [P6WAPI](P6WAPI) compatible environment is generated from the headers and emitted to the returned Supply. The environment will be filled as follows:
 
-  * The `Content-Length` will be set in `CONTENT_LENGTH`.
+  * The `Content-Length` will be set in `CONTENT_LENGTH`, if the client sent a Content-Length header in the request.
 
-  * The `Content-Type` will be set in `CONTENT_TYPE`.
+  * The `Content-Type` will be set in `CONTENT_TYPE`, if the client send a Content-Type header in the request.
 
   * Other headers will be set in `HTTP_*` where the header name is converted to uppercase and dashes are replaced with underscores.
 
@@ -88,7 +88,7 @@ Once the headers for a given frame have been read, a partial [P6WAPI](P6WAPI) co
 
   * The `p6w.input` variable will be set to a sane [Supply](Supply) that emits chunks of the body as bytes as they arrive. No attempt is made to decode these bytes.
 
-All other keys are left empty.
+No other keys will be set. Thus, to create a complete P6WAPI environment, the caller will need to some additional work, such as parsing out the components of the `REQUEST_URI`.
 
 DIAGNOSTICS
 ===========
@@ -136,3 +136,4 @@ COPYRIGHT & LICENSE
 Copyright 2016 Sterling Hanenkamp.
 
 This software is licensed under the same terms as Perl 6.
+

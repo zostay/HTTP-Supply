@@ -1,5 +1,5 @@
 use v6;
-unit class HTTP::Request::Supply:ver<0.1.1>:auth<github:zostay>;
+unit class HTTP::Request::Supply:ver<0.1.2>:auth<github:zostay>;
 
 =NAME HTTP::Request::Supply - A modern HTTP/1.x request parser
 
