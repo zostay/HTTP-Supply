@@ -64,8 +64,8 @@ from an HTTP/1.x connection. Given a L<Supply>, it consumes binary input from
 it. It detects the request frame or frames within the stream and passes them
 back to the tapper asynchronously as they arrive.
 
-This Supply emits L<P6WAPI> compatible environments for use by the caller. If a
-problem is detected in the stream, it will quit with an exception.
+This Supply emits partial L<P6WAPI> compatible environments for use by the
+caller. If a problem is detected in the stream, it will quit with an exception.
 
 =end DESCRIPTION
 
@@ -77,7 +77,7 @@ problem is detected in the stream, it will quit with an exception.
 
     sub parse-http(Supply:D() :$conn, :&promise-maker) returns Supply:D
 
-The given L<Supply>, C<$conn>, must emit a stream of bytes. Any other data will
+The given L<Supply>, C<$conn> must emit a stream of bytes. Any other data will
 result in undefined behavior. This parser assumes binary data will be sent.
 
 The returned supply will react whenever data is emitted on the input supply. The
@@ -89,11 +89,10 @@ Once the headers for a given frame have been read, a partial L<P6WAPI> compatibl
 environment is generated from the headers and emitted to the returned Supply.
 The environment will be filled as follows:
 
-=item The C<Content-Length> will be set in C<CONTENT_LENGTH>, if the client sent
-a Content-Length header in the request.
+=item If a C<Content-Length> header is present, it will be set in
+C<CONTENT_LENGTH>.
 
-=item The C<Content-Type> will be set in C<CONTENT_TYPE>, if the client send a
-Content-Type header in the request.
+=item If a C<Content-Type> header is present, it will be set in C<CONTENT_TYPE>.
 
 =item Other headers will be set in C<HTTP_*> where the header name is converted
 to uppercase and dashes are replaced with underscores.
@@ -110,8 +109,8 @@ chunks of the body as bytes as they arrive. No attempt is made to decode these
 bytes.
 
 No other keys will be set. Thus, to create a complete P6WAPI environment, the
-caller will need to some additional work, such as parsing out the components of
-the C<REQUEST_URI>.
+caller will need to do some additional work, such as parsing out the components
+of the C<REQUEST_URI>.
 
 =head1 DIAGNOSTICS
 
@@ -127,7 +126,7 @@ This exception includes two attributes:
 
 =item C<looks-httpish> is a boolean value that is set to True if the data sent
 resembles HTTP, but the server protocol string does not match either "HTTP/1.0"
-or "HTTP/1.1", e.g., an HTTP/2 connection preface.
+or "HTTP/1.1".
 
 =item C<input> is a L<Supply> that may be tapped to consume the complete stream
 including the bytes already read. This allows chaining of modules similar to
@@ -171,23 +170,25 @@ This software is licensed under the same terms as Perl 6.
 
 =end pod
 
-class GLOBAL::X::HTTP::Request::Supply::UnsupportedProtocol is Exception {
-    has Bool:D $.looks-httpish is required;
-    has Supply:D $.input is required;
-    method message() {
-        $.looks-httpish ?? "HTTP version is not supported."
-                        !! "Unknown protocol."
+package GLOBAL::X::HTTP::Request::Supply {
+    class UnsupportedProtocol is Exception {
+        has Bool:D $.looks-httpish is required;
+        has Supply:D $.input is required;
+        method message() {
+            $.looks-httpish ?? "HTTP version is not supported."
+                            !! "Unknown protocol."
+        }
     }
-}
 
-class GLOBAL::X::HTTP::Request::Supply::BadRequest is Exception {
-    has $.reason is required;
-    method message() { $!reason }
-}
+    class BadRequest is Exception {
+        has $.reason is required;
+        method message() { $!reason }
+    }
 
-class GLOBAL::X::HTTP::Request::Supply::ServerError is Exception {
-    has $.reason is required;
-    method message() { $!reason }
+    class ServerError is Exception {
+        has $.reason is required;
+        method message() { $!reason }
+    }
 }
 
 my constant CR = 0x0d;
