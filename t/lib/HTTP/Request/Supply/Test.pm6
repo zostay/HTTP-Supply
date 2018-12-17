@@ -7,6 +7,7 @@ use HTTP::Request::Supply;
 constant @chunk-sizes = 1, 3, 11, 101, 1009;
 #constant @chunk-sizes = 3;
 
+my $debug = ?%*ENV<HTTP_REQUEST_SUPPLY_TEST_DEBUG> // False;
 
 multi await-or-timeout(Promise:D $p, Int :$seconds = 5, :$message) {
     await Promise.anyof($p, Promise.in($seconds));
@@ -23,22 +24,24 @@ multi await-or-timeout(@p, Int :$seconds = 5, :$message) {
     await-or-timeout(Promise.allof(@p), :$seconds, :$message);
 }
 
-sub run-test($envs, @expected is copy) is export {
+sub run-test($envs, @expected is copy, :%quits) is export {
     my @processing-envs;
 
     # capture test results in closures for later final evaluation
     my @output;
     react {
         whenever $envs -> %env {
-            my %exp = @expected.shift;
+            my %exp = try { @expected.shift } // %();
 
             CATCH {
-                default { .warn; .rethrow }
+                default {
+                    .note; .rethrow
+                }
             }
 
             @output.push: {
                 flunk 'unexpected environment received: ', %env.perl
-                    unless %exp.defined;
+                    without %exp;
             };
 
             my $input   = %env<p6w.input> :delete;
@@ -93,12 +96,18 @@ sub run-test($envs, @expected is copy) is export {
             LAST { done }
 
             QUIT {
-                warn $_;
-                @output.push: { flunk $_ };
+                when %quits<on> {
+                    @output.push: {
+                        pass "Quit on expected error.";
+                    }
+                }
+                default {
+                    .note;
+                    @output.push: { flunk $_ };
+                }
             }
         }
     }
-
 
     await-or-timeout(@processing-envs, :message<processing test environments>);
 
@@ -169,12 +178,13 @@ sub run-tests(@tests, :&reader = &file-reader) is export {
             # note "chunk size $chunk-size";
             my $test-file = "t/data/%test<source>".IO;
             my $envs = HTTP::Request::Supply.parse-http(
-                reader($test-file, :size($chunk-size))
+                reader($test-file, :size($chunk-size)), :$debug
             );
 
             my @expected = |%test<expected>;
+            my %quits    = %test<quits> // %();
 
-            run-test($envs, @expected);
+            run-test($envs, @expected, :%quits);
 
             CATCH {
                 default {
