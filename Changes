@@ -1,3 +1,5 @@
+{{$NEXT}}
+
 v0.2.0	2018-12-17
 
     * Complete rewrite of the core parser, modeled after the RequestParser class
