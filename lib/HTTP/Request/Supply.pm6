@@ -1,4 +1,5 @@
 use v6;
+
 unit class HTTP::Request::Supply:ver<0.1.2>:auth<github:zostay>;
 
 =NAME HTTP::Request::Supply - A modern HTTP/1.x request parser
@@ -15,11 +16,14 @@ unit class HTTP::Request::Supply:ver<0.1.2>:auth<github:zostay>;
                 handle-response($conn, $res);
 
                 QUIT {
-                    when X::HTTP::Request::Supply::UnsupportedProtocol && .looks-httpish {
+                    when X::HTTP::Request::Supply::UnsupportedProtocol {
                         $conn.print("505 HTTP Version Not Supported HTTP/1.1\r\n");
                         $conn.print("Content-Length: 26\r\n");
                         $conn.print("Content-Type: text/plain\r\n\r\n");
                         $conn.print("HTTP Version Not Supported\r\n");
+
+                        .note;
+                        $conn.close;
                     }
 
                     when X::HTTP::Request::Supply::BadRequest {
@@ -28,21 +32,20 @@ unit class HTTP::Request::Supply:ver<0.1.2>:auth<github:zostay>;
                         $conn.print("Content-Type: text/plain\r\n\r\n");
                         $conn.print(.message);
                         $conn.print("\r\n");
+
+                        .note;
+                        $conn.close;
                     }
 
-                    # N.B. This exception should be rarely emitted and indicates that a
-                    # feature is known to exist in HTTP, but this module does not yet
-                    # support it.
-                    when X::HTTP::Request::Supply::ServerError {
+                    default {
                         $conn.print("500 Internal Server Error HTTP/1.1\r\n");
-                        $conn.print("Content-Length: " ~ .message.encode.bytes ~ \r\n");
+                        $conn.print("Content-Length: 22\r\n");
                         $conn.print("Content-Type: text/plain\r\n\r\n");
-                        $conn.print(.message);
-                        $conn.print("\r\n");
-                    }
+                        $conn.print("Internal Server Error\r\n");
 
-                    warn .message;
-                    $conn.close;
+                        .note;
+                        $conn.close;
+                    }
                 }
             }
         }
@@ -54,15 +57,10 @@ unit class HTTP::Request::Supply:ver<0.1.2>:auth<github:zostay>;
 
 B<EXPERIMENTAL:> The API for this module is experimental and may change.
 
-The L<HTTP::Parser> ported from Perl 5 (and the implementation in Perl 5) is
-naïve and really only parses a single HTTP frame (i.e., it provides no
-keep-alive support). However, that is not how the HTTP protocol typically works
-on the modern web.
-
 This class provides a L<Supply> that is able to parse a series of request frames
 from an HTTP/1.x connection. Given a L<Supply>, it consumes binary input from
 it. It detects the request frame or frames within the stream and passes them
-back to the tapper asynchronously as they arrive.
+back to any taps on the supply asynchronously as they arrive.
 
 This Supply emits partial L<P6WAPI> compatible environments for use by the
 caller. If a problem is detected in the stream, it will quit with an exception.
@@ -78,7 +76,8 @@ caller. If a problem is detected in the stream, it will quit with an exception.
     sub parse-http(Supply:D() :$conn, :&promise-maker) returns Supply:D
 
 The given L<Supply>, C<$conn> must emit a stream of bytes. Any other data will
-result in undefined behavior. This parser assumes binary data will be sent.
+result in undefined behavior. The parser assumes that only binary bytes will be
+sent and makes no particular effort to verify that assumption.
 
 The returned supply will react whenever data is emitted on the input supply. The
 incoming bytes are collated into HTTP frames, which are parsed to determine the
@@ -89,6 +88,8 @@ Once the headers for a given frame have been read, a partial L<P6WAPI> compatibl
 environment is generated from the headers and emitted to the returned Supply.
 The environment will be filled as follows:
 
+=over
+
 =item If a C<Content-Length> header is present, it will be set in
 C<CONTENT_LENGTH>.
 
@@ -97,20 +98,22 @@ C<CONTENT_LENGTH>.
 =item Other headers will be set in C<HTTP_*> where the header name is converted
 to uppercase and dashes are replaced with underscores.
 
-=item The C<REQUEST_METHOD> will be set to the method set in the request line.
+=item The C<REQUEST_METHOD> will be set to the method given in the request line.
 
-=item The C<SERVER_PROTOCOL> will be set to the protocol set in the request
-line.
+=item The C<SERVER_PROTOCOL> will be set to the protocol given in the request
+line. (As of this writing, this will always be either HTTP/1.0 or HTTP/1.1 as
+these are the only protocol versions this module currently supports.)
 
-=item The C<REQUEST_URI> will be set to the URI set in the request line.
+=item The C<REQUEST_URI> will be set to the URI given in the request line.
 
 =item The C<p6w.input> variable will be set to a sane L<Supply> that emits
 chunks of the body as bytes as they arrive. No attempt is made to decode these
 bytes.
 
-No other keys will be set. Thus, to create a complete P6WAPI environment, the
-caller will need to do some additional work, such as parsing out the components
-of the C<REQUEST_URI>.
+=back
+
+No other keys will be set. A complete P6WAPI environment must contain many other
+keys.
 
 =head1 DIAGNOSTICS
 
@@ -122,41 +125,35 @@ will trigger the quit handlers on the Supply.
 This exception will be thrown if the stream does not seem to be HTTP or if the
 requested HTTP version is not 1.0 or 1.1.
 
-This exception includes two attributes:
-
-=item C<looks-httpish> is a boolean value that is set to True if the data sent
-resembles HTTP, but the server protocol string does not match either "HTTP/1.0"
-or "HTTP/1.1".
-
-=item C<input> is a L<Supply> that may be tapped to consume the complete stream
-including the bytes already read. This allows chaining of modules similar to
-this one to handle other protocols that might happen over the web server's
-port.
-
 =head2 X::HTTP::Request::Supply::BadRequest
 
 This exception will be thrown if the HTTP request is incorrectly framed. This
 may happen when the request does not specify its content length using a
 C<Content-Length> header or chunked C<Transfer-Encoding>.
 
-=head2 X::HTTP::Request::Supply::ServerError
-
-This exception may be thrown when a feature of HTTP/1.0 or HTTP/1.1 is not
-implemented.
-
 =head1 CAVEATS
 
+This code aims at providing a minimal implementation that is just enough to
+decode the HTTP frames and provide the information about the raw requests to the
+tapping code. It is not safe to assume that anything provided has been validated
+or processed.
+
 HTTP is complicated and hard. This implementation is not yet complete and not
-battle tested yet. Please report bugs to github and patches are welcome.
+battle tested yet. Please report bugs to github and patches are welcome. Even
+once this code matures, it will never receive the TLC that a full-blown general
+web server is going to get as regards hardening and maturity on the Internet. As
+such, the author always recommends using this code behind an existing,
+well-known, and well-maintained web server in production. This is only ever
+intended as a "bare metal" application server interface.
 
 This interface is built with the intention of making it easier to build HTTP/1.0
 and HTTP/1.1 parsers for use with L<P6WAPI>. As of this writing, that
 specification is only a proposed draft, so the output of this module is
-experiemental and will change as that specification changes.
+experimental and will change as that specification changes.
 
-Finally, one limitation of this module is that it is only responsible for
-parsing the incoming HTTP frames. It will not manage the connection and it
-provides no tools for sending responses back to the user agent.
+Finally, this module only takes responsibility for parsing the incoming HTTP
+frames. It does not manage the connection and it provides no tools for sending
+responses back to the user agent.
 
 =head1 AUTHOR
 
@@ -172,20 +169,10 @@ This software is licensed under the same terms as Perl 6.
 
 package GLOBAL::X::HTTP::Request::Supply {
     class UnsupportedProtocol is Exception {
-        has Bool:D $.looks-httpish is required;
-        #has Supply:D $.input is required;
-        method message() {
-            $.looks-httpish ?? "HTTP version is not supported."
-                            !! "Unknown protocol."
-        }
+        method message() { "HTTP version is not supported." }
     }
 
     class BadRequest is Exception {
-        has $.reason is required;
-        method message() { $!reason }
-    }
-
-    class ServerError is Exception {
         has $.reason is required;
         method message() { $!reason }
     }
@@ -464,17 +451,29 @@ multi method parse-http(Supply:D() $conn, Bool :$debug = False --> Supply:D) {
                         debug("REQLINE [$line]");
 
                         # Break the line up into parts
-                        my ($method, $uri, $http-version) = $line.split(' ', 3);
+                        my ($method, $uri, $http-version, @error) = $line.split(' ', 3);
 
-                        # Looks HTTP-ish, but not our thing... quit now!
+                        # We got more than three strings, which is not okay.
+                        if @error {
+                            die X::HTTP::Request::Supply::BadRequest.new(
+                                reason => 'request line contains too many fields',
+                            );
+                        }
+
+                        # We got just three parts, but the last is not an HTTP
+                        # version we support.
                         if $http-version ~~ none('HTTP/1.0', 'HTTP/1.1') {
+
+                            # Looks like an HTTP we don't support
                             if $http-version.defined && $http-version ~~ /^ 'HTTP/' <[0..9]>+ '.' <[0..9]>+ $/ {
-                                X::HTTP::Request::Supply::UnsupportedProtocol.new(:looks-httpish).throw;
+                                die X::HTTP::Request::Supply::UnsupportedProtocol.new.throw;
                             }
+
+                            # It is other.
                             else {
-                                X::HTTP::Request::Supply::BadRequest.new(
+                                die X::HTTP::Request::Supply::BadRequest.new(
                                     reason => 'trailing garbage found after request',
-                                ).throw;
+                                );
                             }
                         }
 

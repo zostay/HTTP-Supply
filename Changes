@@ -1,5 +1,8 @@
 {{$NEXT}}
 
+    * Complete rewrite of the core parser, modeled after the RequestParser class
+      of Cro.
+
 v0.1.2	2018-11-11
 
     * Fix location of use v6 for v6.d. :(
