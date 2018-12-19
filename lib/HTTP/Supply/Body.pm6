@@ -7,7 +7,7 @@ use HTTP::Supply::Tools;
 class Body {
     has Supplier $.body-stream;
     has Promise $.left-over;
-    has %.env;
+    has %.header;
 
     method decode(Supply $body-sink) {
         $body-sink.tap:
@@ -87,7 +87,7 @@ class Body::ChunkedEncoding is Body {
 
                 # Zero size means end of chunking
                 if $parsed-size == 0 {
-                    if %.env<HTTP_TRAILER> {
+                    if %.header<trailer> {
                         $!expect = Trailers;
                         return TryThisData;
                     }
@@ -178,8 +178,8 @@ class Body::ContentLength is Body {
 
     method process-bytes(Blob $buf) {
         # All data received. Anything left-over should be kept.
-        if $buf.bytes + $.bytes-read >= %.env<CONTENT_LENGTH> {
-            my $bytes-remaining = $.env<CONTENT_LENGTH> - $.bytes-read;
+        if $buf.bytes + $.bytes-read >= %.header<content-length> {
+            my $bytes-remaining = $.header<content-length> - $.bytes-read;
 
             $.body-stream.emit: $buf.subbuf(0, $bytes-remaining)
                 if $bytes-remaining > 0;

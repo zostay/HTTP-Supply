@@ -104,7 +104,7 @@ multi method parse-http(Supply:D() $conn, Bool :$debug = False --> Supply:D) {
                                 $left-over = Promise.new;
 
                                 # Construst the decoder and tap the body-sink
-                                my $body-decoder = $body-decoder-class.new(:$body-stream, $left-over, :headers(@res[1]));
+                                my $body-decoder = $body-decoder-class.new(:$body-stream, $left-over, :header(@res[1]));
                                 $body-decoder.decode($body-sink.Supply);
 
                                 # Get the existing chunks and put them into the

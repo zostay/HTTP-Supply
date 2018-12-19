@@ -192,6 +192,7 @@ multi method parse-http(Supply:D() $conn, Bool :$debug = False --> Supply:D) {
     supply {
         my enum <RequestLine Header Body Close>;
         my $expect;
+        my %header;
         my %env;
         my buf8 $acc;
         my Supplier $body-sink;
@@ -204,6 +205,7 @@ multi method parse-http(Supply:D() $conn, Bool :$debug = False --> Supply:D) {
             $acc ~= .result with $left-over;
             $left-over = Nil;
             $body-sink = Nil;
+            %header := %();
             %env := %();
             $previous-header = Pair;
         }
@@ -279,13 +281,13 @@ multi method parse-http(Supply:D() $conn, Bool :$debug = False --> Supply:D) {
 
                             # Setup the body decoder itself
                             # TODO Someday this could be pluggable.
-                            debug("ENV ", %env.perl);
+                            debug("HEADER ", %header.perl);
                             my $body-decoder-class = do
-                                if %env<HTTP_TRANSFER_ENCODING>.defined
-                                && %env<HTTP_TRANSFER_ENCODING> eq 'chunked' {
+                                if %header<transfer-encoding>.defined
+                                && %header<transfer-encoding> eq 'chunked' {
                                     HTTP::Supply::Body::ChunkedEncoding
                                 }
-                                elsif %env<CONTENT_LENGTH>.defined {
+                                elsif %header<content-length>.defined {
                                     HTTP::Supply::Body::ContentLength
                                 }
                                 else {
@@ -310,8 +312,12 @@ multi method parse-http(Supply:D() $conn, Bool :$debug = False --> Supply:D) {
                                 $left-over = Promise.new;
 
                                 # Construct the decoder and tap the body-sink
-                                my $body-decoder = $body-decoder-class.new(:$body-stream, :$left-over, :%env);
+                                my $body-decoder = $body-decoder-class.new(:$body-stream, :$left-over, :%header);
                                 $body-decoder.decode($body-sink.Supply);
+
+                                # Convert headers into HTTP_HEADERS
+                                %env{ make-p6wapi-name(.key) } = .value for %header;
+                                debug("ENV ", %env.perl);
 
                                 # Get the existing chunks and put them into the
                                 # body sink
@@ -339,6 +345,9 @@ multi method parse-http(Supply:D() $conn, Bool :$debug = False --> Supply:D) {
 
                             # No body expected. Emit and move on.
                             else {
+                                # Convert headers into HTTP_HEADERS
+                                %env{ make-p6wapi-name(.key) } = .value for %header;
+
                                 # Emit the completed environment.
                                 $body-stream.done;
                                 emit %env;
@@ -368,23 +377,20 @@ multi method parse-http(Supply:D() $conn, Bool :$debug = False --> Supply:D) {
                             # Break the header line by the :
                             my ($name, $value) = $line.split(": ");
 
-                            # Setup the name for the P6WAPI environment
-                            $name = make-p6wapi-name($name);
-
                             # Save the value into the environment
-                            if %env{ $name } :exists {
+                            if %header{ $name.fc } :exists {
 
                                 # Some headers can be provided more than once.
-                                %env{ $name } ~= ',' ~ $value;
+                                %header{ $name.fc } ~= ',' ~ $value;
                             }
                             else {
 
                                 # First occurrence of a header.
-                                %env{ $name } = $value;
+                                %header{ $name.fc } = $value;
                             }
 
                             # Remember the header line for folded lines.
-                            $previous-header = %env{ $name } :p;
+                            $previous-header = %header{ $name.fc } :p;
                         }
                     }
 
