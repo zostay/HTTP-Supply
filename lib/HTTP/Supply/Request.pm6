@@ -1,22 +1,22 @@
 use v6;
 
-unit class HTTP::Request::Supply:ver<0.2.0>:auth<github:zostay>;
+unit class HTTP::Supply::Request:ver<0.2.0>:auth<github:zostay>;
 
-=NAME HTTP::Request::Supply - A modern HTTP/1.x request parser
+=NAME HTTP::Supply::Request - A modern HTTP/1.x request parser
 
 =begin SYNOPSIS
 
-    use HTTP::Request::Supply;
+    use HTTP::Supply::Request;
 
     react {
         whenever IO::Socket::Async.listen('localhost', 8080) -> $conn {
-            my $envs = HTTP::Request::Supply.parse-http($conn);
+            my $envs = HTTP::Supply::Request.parse-http($conn);
             whenever $envs -> %env {
                 my $res = await app(%env);
                 handle-response($conn, $res);
 
                 QUIT {
-                    when X::HTTP::Request::Supply::UnsupportedProtocol {
+                    when X::HTTP::Supply::Request::UnsupportedProtocol {
                         $conn.print("505 HTTP Version Not Supported HTTP/1.1\r\n");
                         $conn.print("Content-Length: 26\r\n");
                         $conn.print("Content-Type: text/plain\r\n\r\n");
@@ -26,7 +26,7 @@ unit class HTTP::Request::Supply:ver<0.2.0>:auth<github:zostay>;
                         $conn.close;
                     }
 
-                    when X::HTTP::Request::Supply::BadRequest {
+                    when X::HTTP::Supply::Request::BadRequest {
                         $conn.print("400 Bad Request HTTP/1.1\r\n");
                         $conn.print("Content-Length: " ~ .message.encode.bytes ~ \r\n");
                         $conn.print("Content-Type: text/plain\r\n\r\n");
@@ -120,12 +120,12 @@ keys.
 The following exceptions are thrown by this class while processing input, which
 will trigger the quit handlers on the Supply.
 
-=head2 X::HTTP::Request::Supply::UnsupportedProtocol
+=head2 X::HTTP::Supply::Request::UnsupportedProtocol
 
 This exception will be thrown if the stream does not seem to be HTTP or if the
 requested HTTP version is not 1.0 or 1.1.
 
-=head2 X::HTTP::Request::Supply::BadRequest
+=head2 X::HTTP::Supply::Request::BadRequest
 
 This exception will be thrown if the HTTP request is incorrectly framed. This
 may happen when the request does not specify its content length using a
@@ -167,7 +167,7 @@ This software is licensed under the same terms as Perl 6.
 
 =end pod
 
-package GLOBAL::X::HTTP::Request::Supply {
+package GLOBAL::X::HTTP::Supply::Request {
     class UnsupportedProtocol is Exception {
         method message() { "HTTP version is not supported." }
     }
@@ -282,7 +282,7 @@ class Body::ChunkedEncoding is Body {
                 my $parsed-size = try {
                     CATCH {
                         when X::Str::Numeric {
-                            die X::HTTP::Request::Supply::BadRequest.new(
+                            die X::HTTP::Supply::Request::BadRequest.new(
                                 reason => "encountered non-hexadecimal value when processing chunked encoding",
                             );
                         }
@@ -343,7 +343,7 @@ class Body::ChunkedEncoding is Body {
 
                 # Handle trailer folder
                 elsif $line.starts-with(' ') {
-                    die X::HTTP::Request::Supply::BadRequest.new(
+                    die X::HTTP::Supply::Request::BadRequest.new(
                         reason => 'trailer folding encountered before any trailer was sent',
                     ) without $!previous-header;
 
@@ -455,7 +455,7 @@ multi method parse-http(Supply:D() $conn, Bool :$debug = False --> Supply:D) {
 
                         # We got more than three strings, which is not okay.
                         if @error {
-                            die X::HTTP::Request::Supply::BadRequest.new(
+                            die X::HTTP::Supply::Request::BadRequest.new(
                                 reason => 'request line contains too many fields',
                             );
                         }
@@ -466,12 +466,12 @@ multi method parse-http(Supply:D() $conn, Bool :$debug = False --> Supply:D) {
 
                             # Looks like an HTTP we don't support
                             if $http-version.defined && $http-version ~~ /^ 'HTTP/' <[0..9]>+ '.' <[0..9]>+ $/ {
-                                die X::HTTP::Request::Supply::UnsupportedProtocol.new.throw;
+                                die X::HTTP::Supply::Request::UnsupportedProtocol.new.throw;
                             }
 
                             # It is other.
                             else {
-                                die X::HTTP::Request::Supply::BadRequest.new(
+                                die X::HTTP::Supply::Request::BadRequest.new(
                                     reason => 'trailing garbage found after request',
                                 );
                             }
@@ -504,10 +504,10 @@ multi method parse-http(Supply:D() $conn, Bool :$debug = False --> Supply:D) {
                             my $body-decoder-class = do
                                 if %env<HTTP_TRANSFER_ENCODING>.defined
                                 && %env<HTTP_TRANSFER_ENCODING> eq 'chunked' {
-                                    HTTP::Request::Supply::Body::ChunkedEncoding
+                                    HTTP::Supply::Request::Body::ChunkedEncoding
                                 }
                                 elsif %env<CONTENT_LENGTH>.defined {
-                                    HTTP::Request::Supply::Body::ContentLength
+                                    HTTP::Supply::Request::Body::ContentLength
                                 }
                                 else {
                                     Nil
@@ -520,7 +520,7 @@ multi method parse-http(Supply:D() $conn, Bool :$debug = False --> Supply:D) {
                             %env<p6w.input> = $body-stream.Supply;
 
                             # If we expect a body to decode, setup the decoder
-                            if $body-decoder-class ~~ HTTP::Request::Supply::Body {
+                            if $body-decoder-class ~~ HTTP::Supply::Request::Body {
                                 debug("DECODE BODY");
 
                                 # Setup the stream we will send to the body decoder
@@ -575,7 +575,7 @@ multi method parse-http(Supply:D() $conn, Bool :$debug = False --> Supply:D) {
                         elsif $line.starts-with(' ') {
                             debug("CONT HEADER ", $line);
 
-                            die X::HTTP::Request::Supply::BadRequest.new(
+                            die X::HTTP::Supply::Request::BadRequest.new(
                                 reason => 'header folding encountered before any header was sent',
                             ) without $previous-header;
 

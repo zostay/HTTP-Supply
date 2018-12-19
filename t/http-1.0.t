@@ -2,10 +2,10 @@
 use v6;
 
 use Test;
-use HTTP::Request::Supply;
+use HTTP::Supply::Request;
 
 use lib 't/lib';
-use HTTP::Request::Supply::Test;
+use HTTP::Supply::Request::Test;
 
 my @tests =
     {

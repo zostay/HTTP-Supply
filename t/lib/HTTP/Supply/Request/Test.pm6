@@ -1,8 +1,8 @@
 use v6;
-unit module HTTP::Request::Supply::Test;
+unit module HTTP::Supply::Request::Test;
 
 use Test;
-use HTTP::Request::Supply;
+use HTTP::Supply::Request;
 
 constant @chunk-sizes = 1, 3, 11, 101, 1009;
 #constant @chunk-sizes = 3;
@@ -177,7 +177,7 @@ sub run-tests(@tests, :&reader = &file-reader) is export {
         for @chunk-sizes -> $chunk-size {
             # note "chunk size $chunk-size";
             my $test-file = "t/data/%test<source>".IO;
-            my $envs = HTTP::Request::Supply.parse-http(
+            my $envs = HTTP::Supply::Request.parse-http(
                 reader($test-file, :size($chunk-size)), :$debug
             );
 
