@@ -41,6 +41,7 @@ my @tests =
     },
     ;
 
-run-tests @tests;
+my $tester = HTTP::Supply::Request::Test.new(:@tests);
+$tester.run-tests;
 
 done-testing;

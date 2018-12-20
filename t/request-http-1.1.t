@@ -75,7 +75,8 @@ my @tests =
     },
     ;
 
-run-tests @tests;
-run-tests @tests, :reader(&socket-reader);
+my $tester = HTTP::Supply::Request::Test.new(:@tests);
+$tester.run-tests;
+$tester.run-tests: :reader<socket>;
 
 done-testing;

@@ -66,7 +66,7 @@ my @tests =
             HTTP_CONNECTION    => 'keep-alive',
             HTTP_USER_AGENT    => 'Mozilla/Inf',
             'p6w.input'        => "a=1&b=2&c=3\r\n\r\n",
-       }, {
+        }, {
            REQUEST_METHOD     => 'GET',
            REQUEST_URI        => 'http://example.com/image.png',
            SERVER_PROTOCOL    => 'HTTP/1.0',
@@ -92,7 +92,9 @@ my @tests =
     },
 ;
 
-run-tests @tests;
-run-tests @tests, :reader(&socket-reader);
+my $tester = HTTP::Supply::Request::Test.new(:@tests);
+
+$tester.run-tests(:reader<file>);
+$tester.run-tests(:reader<socket>);
 
 done-testing;
