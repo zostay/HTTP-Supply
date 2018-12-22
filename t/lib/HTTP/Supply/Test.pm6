@@ -4,7 +4,7 @@ unit class HTTP::Supply::Test;
 
 use Test;
 
-has Hash @.tests;
+has @.tests;
 has Bool $.debug = ?%*ENV<HTTP_SUPPLY_TEST_DEBUG> // False;
 
 multi method await-or-timeout(Promise:D $p, Int :$seconds = 5, :$message) {
@@ -97,10 +97,10 @@ method run-tests(:$reader = 'file') is export {
             my $test-file = "t/data/%test<source>".IO;
             my $gots = self.test-class.parse-http(
                 self.setup-reader($reader, :$test-file, :size($chunk-size)),
-                :$!debug
+                :$!debug,
             );
 
-            my @expected = |%test<expected>;
+            my @expected := %test<expected>;
             my %quits    = %test<quits> // %();
 
             self.run-test($gots, @expected, :%quits);

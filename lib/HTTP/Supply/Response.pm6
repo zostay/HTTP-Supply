@@ -2,7 +2,21 @@ use v6;
 
 unit class HTTP::Supply::Response:ver<0.2.0>:auth<github:zostay>;
 
+use HTTP::Supply::Body;
 use HTTP::Supply::Tools;
+
+method !make-header(@header) {
+    my %header;
+    for @header {
+        if %header{ .key } :exists {
+            %header{ .key } ~= ',' ~ .value;
+        }
+        else {
+            %header{ .key } = .value;
+        }
+    }
+    %header;
+}
 
 multi method parse-http(Supply:D() $conn, Bool :$debug = False --> Supply:D) {
     sub debug(*@msg) {
@@ -15,7 +29,6 @@ multi method parse-http(Supply:D() $conn, Bool :$debug = False --> Supply:D) {
         my @res;
         my buf8 $acc;
         my Supplier $body-sink;
-        my $previous-header;
         my Promise $left-over;
 
         my sub new-response() {
@@ -24,11 +37,10 @@ multi method parse-http(Supply:D() $conn, Bool :$debug = False --> Supply:D) {
             $acc ~= .result with $left-over;
             $left-over = Nil;
             $body-sink = Nil;
-            @res := @(Nil, [], Nil);
-            $prevoius-header = Pair;
+            @res := [ Nil, [], Nil ];
         }
 
-        new-request();
+        new-response();
 
         whenever $conn -> $chunk {
             # When expected a header add the chunk to the accumulation buffer.
@@ -51,8 +63,12 @@ multi method parse-http(Supply:D() $conn, Bool :$debug = False --> Supply:D) {
                         # Break the line up into parts
                         my ($http-version, $status-code, $status-message) = $line.split(' ', 3);
 
+                        # TODO Throw exception on unexpected HTTP version?
+
+                        # TODO Throw exception on non-numeric status-code?
+
                         # Save the status line
-                        @res[0] = $status-code;
+                        @res[0] = $status-code.Int;
                         @res[1].push: 'x-server-protocol' => $http-version;
                         @res[1].push: 'x-server-status-message' => $status-message;
 
@@ -68,6 +84,7 @@ multi method parse-http(Supply:D() $conn, Bool :$debug = False --> Supply:D) {
                         last CHUNK_PROCESS without $line;
 
                         # Empty line signals the end of the header
+                        my %header := self!make-header(@res[1]);
                         if $line eq '' {
                             debug("HEADER END");
 
@@ -75,11 +92,11 @@ multi method parse-http(Supply:D() $conn, Bool :$debug = False --> Supply:D) {
                             debug("STATUS", @res[0]);
                             debug("HEAD ", @res[1].perl);
                             my $body-decoder-class = do
-                                if @res[1]<transfer-encoding>.defined
-                                && @res[1]<transfer-encoding> eq 'chunked' {
+                                if %header<transfer-encoding>.defined
+                                && %header<transfer-encoding> eq 'chunked' {
                                     HTTP::Supply::Body::ChunkedEncoding
                                 }
-                                elsif @res[1]<content-length>.defined {
+                                elsif %header<content-length>.defined {
                                     HTTP::Supply::Body::ContentLength
                                 }
                                 else {
@@ -104,7 +121,9 @@ multi method parse-http(Supply:D() $conn, Bool :$debug = False --> Supply:D) {
                                 $left-over = Promise.new;
 
                                 # Construst the decoder and tap the body-sink
-                                my $body-decoder = $body-decoder-class.new(:$body-stream, $left-over, :header(@res[1]));
+                                my $body-decoder = $body-decoder-class.new(
+                                    :$body-stream, :$left-over, :%header,
+                                );
                                 $body-decoder.decode($body-sink.Supply);
 
                                 # Get the existing chunks and put them into the
@@ -113,6 +132,7 @@ multi method parse-http(Supply:D() $conn, Bool :$debug = False --> Supply:D) {
 
                                 # Emit the resposne, its processing can begin
                                 # while we continue to receive the body.
+                                debug("EMIT ", @res.perl);
                                 emit @res;
 
                                 # Is the body decoder done already?
@@ -150,7 +170,7 @@ multi method parse-http(Supply:D() $conn, Bool :$debug = False --> Supply:D) {
 
                             # TODO Exception here?
 
-                            $previous-header.value ~= $line.trim-leading;
+                            @res[1][*-1].value ~= $line.trim-leading;
                         }
 
                         # We have received a new header. Save it.
@@ -164,19 +184,7 @@ multi method parse-http(Supply:D() $conn, Bool :$debug = False --> Supply:D) {
                             $name .= fc;
 
                             # Save the value into the response
-                            if @res[1]{ $name } :exists {
-
-                                # Some headers can be provided more than once.
-                                @res[1]{ $name } ~= ',' ~ $value;
-                            }
-                            else {
-
-                                # First occurrence of header.
-                                @res[1]{ $name } = $value;
-                            }
-
-                            # Remember the header line for folded lines.
-                            $previous-header = @res[1]{ $name } :p;
+                            @res[1].push: $name => $value;
                         }
                     }
 
@@ -190,7 +198,7 @@ multi method parse-http(Supply:D() $conn, Bool :$debug = False --> Supply:D) {
                         # The response finished and the pipeline is ready with
                         # another response, so begin again.
                         if $left-over.status == Kept {
-                            new-request();
+                            new-response();
                             next CHUNK_PROCESS;
                         }
 
@@ -201,9 +209,6 @@ multi method parse-http(Supply:D() $conn, Bool :$debug = False --> Supply:D) {
                     }
                 }
             }
-        }
-    }
-
         }
     }
 }

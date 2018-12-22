@@ -312,7 +312,11 @@ multi method parse-http(Supply:D() $conn, Bool :$debug = False --> Supply:D) {
                                 $left-over = Promise.new;
 
                                 # Construct the decoder and tap the body-sink
-                                my $body-decoder = $body-decoder-class.new(:$body-stream, :$left-over, :%header);
+                                my $body-decoder = $body-decoder-class.new(
+                                    :$body-stream,
+                                    :$left-over,
+                                    :%header,
+                                );
                                 $body-decoder.decode($body-sink.Supply);
 
                                 # Convert headers into HTTP_HEADERS
