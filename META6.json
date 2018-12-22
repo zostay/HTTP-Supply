@@ -1,9 +1,9 @@
 {
   "tags": [
-    
+
   ],
   "resources": [
-    
+
   ],
   "perl": "6.c",
   "meta-version": "0",
@@ -12,21 +12,23 @@
     "Test::META"
   ],
   "depends": [
-    
+
   ],
   "provides": {
-    "HTTP::Request::Supply": "lib/HTTP/Request/Supply.pm6"
+    "HTTP::Supply": "lib/HTTP/Supply.pm6",
+    "HTTP::Supply::Request": "lib/HTTP/Supply/Request.pm6",
+    "HTTP::Supply::Response": "lib/HTTP/Supply/Response.pm6"
   },
   "build-depends": [
-    
+
   ],
   "license": "Artistic-2.0",
   "auth": "github:zostay",
-  "description": "A modern HTTP request parser",
-  "name": "HTTP::Request::Supply",
-  "source-url": "git://github.com/zostay/HTTP-Request-Supply.git",
+  "description": "A modern HTTP pipeline parser",
+  "name": "HTTP::Supply",
+  "source-url": "git://github.com/zostay/HTTP-Supply.git",
   "support": {
-    "source": "git://github.com/zostay/HTTP-Request-Supply.git"
+    "source": "git://github.com/zostay/HTTP-Supply.git"
   },
   "version": "0.2.0",
   "authors": [

@@ -2,15 +2,15 @@
 use v6;
 
 use Test;
-use HTTP::Request::Supply;
+use HTTP::Supply::Request;
 
 use lib 't/lib';
-use HTTP::Request::Supply::Test;
+use HTTP::Supply::Request::Test;
 
 my @tests =
     {
         source   => 'http-1.0-trailing-garbage.txt',
-        quits    => %(:on(X::HTTP::Request::Supply::BadRequest)),
+        quits    => %(:on(X::HTTP::Supply::BadMessage)),
         expected => ({
             REQUEST_METHOD     => 'POST',
             REQUEST_URI        => '/index.html',
@@ -25,7 +25,7 @@ my @tests =
     },
     {
         source   => 'http-1.1-trailing-garbage.txt',
-        quits    => %(:on(X::HTTP::Request::Supply::BadRequest)),
+        quits    => %(:on(X::HTTP::Supply::BadMessage)),
         expected => ({
             REQUEST_METHOD     => 'POST',
             REQUEST_URI        => '/index.html',
@@ -41,6 +41,7 @@ my @tests =
     },
     ;
 
-run-tests @tests;
+my $tester = HTTP::Supply::Request::Test.new(:@tests);
+$tester.run-tests;
 
 done-testing;
