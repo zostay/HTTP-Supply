@@ -1,4 +1,4 @@
-{{$NEXT}}
+v0.3.0	2018-12-21
 
     * BREAKING: X::HTTP::Request::Supply::UnsupportedProtocol has been
       renamed to X::HTTP::Supply::UnsupportedProtocol.
