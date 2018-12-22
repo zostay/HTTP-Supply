@@ -1,23 +1,24 @@
 {
   "tags": [
-    
+
   ],
   "authors": [
     "Sterling Hanenkamp <hanenkamp@cpan.org>"
   ],
   "build-depends": [
-    
+
   ],
   "provides": {
     "HTTP::Supply": "lib/HTTP/Supply.pm6",
     "HTTP::Supply::Request": "lib/HTTP/Supply/Request.pm6",
-    "HTTP::Supply::Response": "lib/HTTP/Supply/Response.pm6"
+    "HTTP::Supply::Response": "lib/HTTP/Supply/Response.pm6",
+    "HTTP::Request::Supply": "lib/HTTP/Request/Supply.pm6"
   },
   "perl": "6.c",
   "license": "Artistic-2.0",
   "auth": "github:zostay",
   "resources": [
-    
+
   ],
   "name": "HTTP::Supply",
   "meta-version": "0",
@@ -29,7 +30,7 @@
     "Test::META"
   ],
   "depends": [
-    
+
   ],
   "description": "A modern HTTP pipeline parser",
   "version": "0.3.0",
