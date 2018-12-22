@@ -1,5 +1,15 @@
 {{$NEXT}}
 
+    * BREAKING: X::HTTP::Request::Supply::UnsupportedProtocol has been
+      renamed to X::HTTP::Supply::UnsupportedProtocol.
+    * BREAKING: X::HTTP::Request::Supply::BadRequest has been renamed to
+      X::HTTP::Supply::BadMessage.
+    * DEPRECATED: HTTP::Request::Supply has been renamed to
+      HTTP::Supply::Request with the distribution now being named HTTP::Supply.
+    * HTTP::Supply::Response has been added to perform the
+      complementary response parser for HTTP/1.x pipelines.
+    * All exceptions thrown now inherit from X::HTTP::Supply.
+
 v0.2.0	2018-12-17
 
     * Complete rewrite of the core parser, modeled after the RequestParser class
