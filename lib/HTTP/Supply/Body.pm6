@@ -76,7 +76,7 @@ class Body::ChunkedEncoding is Body {
                 my $parsed-size = try {
                     CATCH {
                         when X::Str::Numeric {
-                            die X::HTTP::Supply::Request::BadRequest.new(
+                            die X::HTTP::Supply::BadMessage.new(
                                 reason => "encountered non-hexadecimal value when processing chunked encoding",
                             );
                         }
@@ -137,7 +137,7 @@ class Body::ChunkedEncoding is Body {
 
                 # Handle trailer folder
                 elsif $line.starts-with(' ') {
-                    die X::HTTP::Supply::Request::BadRequest.new(
+                    die X::HTTP::Supply::BadMessage.new(
                         reason => 'trailer folding encountered before any trailer was sent',
                     ) without $!previous-header;
 

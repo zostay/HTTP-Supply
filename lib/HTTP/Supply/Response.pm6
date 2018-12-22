@@ -1,9 +1,135 @@
 use v6;
 
-unit class HTTP::Supply::Response:ver<0.2.0>:auth<github:zostay>;
+unit class HTTP::Supply::Response;
 
+use HTTP::Supply;
 use HTTP::Supply::Body;
 use HTTP::Supply::Tools;
+
+=begin pod
+
+=NAME HTTP::Supply::Response - A modern HTTP/1.x response parser
+
+=begin SYNOPSIS
+
+    use HTTP::Supply::Response;
+
+    my @pipeline = <
+        /stuff
+        /things
+        /more-stuff
+    >;
+
+    sub fetch-next($conn) {
+        my $uri = @pipeline.pop;
+        with $uri {
+            $conn.print("GET $uri HTTP/1.1\r\n");
+            True;
+        }
+        else {
+            $conn.close;
+            False;
+        }
+    }
+
+    react {
+        whenever IO::Socket::Async.connect('localhost', 8080) -> $conn {
+            fetch-next($conn);
+
+            whenever HTTP::Supply::Response.parse-http($conn) -> $res {
+                if $res[0] == 200 {
+                    $res[2].reduce({ $^a ~ $^b }).decode('utf8').say;
+                    done unless fetch-next($conn);
+                }
+                else {
+                    die "Bad things happened: $res[0] {$res[1].grep(*.key eq '::server-reason-phrase'}";
+                }
+            }
+        }
+    }
+
+=end SYNOPSIS
+
+=begin DESCRIPTION
+
+B<EXPERIMENTAL:> The API for this module is experimental and may change.
+
+This class provides C<method parse-http> that parses incoming data from a
+L<Supply> that is expected to emit raw binary data. It returns a Supply that
+emits a response for each HTTP/1.x response frame parsed from the incoming data.
+Each frame is returned as it arrives asynchronously.
+
+
+This Supply emits an extended L<P6WAPI> response for use by the caller. If a
+problem is detected in the stream, it will quit with an exception.
+
+=end DESCRIPTION
+
+=head1 METHODS
+
+=ehad2 method parse-http
+
+    method parse-http(HTTP::Supply::Response: Supply:D() $conn, Bool :$debug = False) returns Supply:D
+
+THe given L<Supply>, C<$conn>, must emit a stream of bytes. Any other data will
+result in undefined behavior. The parser assumes that only binary bytes will be
+sent and makes no particular effort to verify that assumption.
+
+The returns Supply will emit a response whenever a response frame can be parsed
+from the input supply. The response will be emitted as soon as the header has
+been read. The response includes a supply containing the body, which will be
+emitted as more binary bytes as it arrives.
+
+The response is emitted as an extended L<P6WAPI> response. It will be a
+L<Positional> object with three elements:
+
+=over
+
+=item The first element will be the numeric status code from the status line.
+
+=item The second element will be an L<Array> of L<Pair>s for the headers.
+
+=item The thirs will be a sane Supply that will emit the bytes in the message body.
+
+=back
+
+The headers are provided in the order they are received with any repeats
+included as-is. The header names will be set in each key using folded case
+(which means lower case as the headers will be decoded using ISO-8859-1).
+
+The header will also include two special fields:
+
+=over
+
+=item The C<::server-protocol> key will be set to the server protocol set in the
+status line of the response. This will be either "HTTP/1.0" or "HTTP/1.1".
+
+=item The C<::server-reason-phrase> key will be set to the reason phrase set by
+the server in the status line of the response after the numeric code. This will
+usually be something like "OK" when the status code is 200, "Not Found" when the
+status code is 404, etc.
+
+=back
+
+The parser aims at being very liberal in what it accepts. It is possible for the
+headers to contain non-sensical values. So long as the format is syntactically
+readable and the frames appear to make sense, the parser will continue emitting
+responses as they arrive. Ensuring proper HTTP semantics and connection handling
+is left up to the caller.
+
+=head1 DIAGNOSTICS
+
+In certain cases, the parser may caues the Supply to quit with an error.
+
+=head2 X::HTTP::Supply::UnsupportedProtocol
+
+This exception will be thrown if the message reports a server protocol that looks like HTTP, but is not HTTP/1.0 or HTTP/1.1.
+
+=head2 X::HTTP::Supply::BadMessage
+
+If there is any syntax error, this message may be thrown. This may also be thrown on certain obvious semantic errors. Even these, however, are primarily oriented toward sanity checking the syntax of each response frame.
+
+=end pod
 
 method !make-header(@header) {
     my %header;
@@ -18,7 +144,7 @@ method !make-header(@header) {
     %header;
 }
 
-multi method parse-http(Supply:D() $conn, Bool :$debug = False --> Supply:D) {
+method parse-http(Supply:D() $conn, Bool :$debug = False --> Supply:D) {
     sub debug(*@msg) {
         note "# [{now.Rat.fmt("%.5f")}] (#$*THREAD.id()) ", |@msg if $debug
     }
@@ -63,14 +189,33 @@ multi method parse-http(Supply:D() $conn, Bool :$debug = False --> Supply:D) {
                         # Break the line up into parts
                         my ($http-version, $status-code, $status-message) = $line.split(' ', 3);
 
-                        # TODO Throw exception on unexpected HTTP version?
+                        # Make sure the status code is numeric and sane-ish
+                        if $status-code !~~ /^ <[1..5]> <[0..9]> <[0..9]> $/ {
+                            die X::HTTP::Supply::BadMessage.new(
+                                reason => 'status code is not numeric or not in the 100-599 range',
+                            );
+                        }
 
-                        # TODO Throw exception on non-numeric status-code?
+                        # We got what looks like a status-line, let's check it
+                        # just a bit.
+                        if ($http-version//'') eq none('HTTP/1.0', 'HTTP/1.1') {
+                            # Looks like HTTP/*?
+                            if $http-version.defined && $http-version ~~ /^ 'HTTP/' <[0..9]>+ / {
+                                die X::HTTP::Supply::UnsupportedProtocol.new.throw;
+                            }
+
+                            # It is other.
+                            else {
+                                die X::HTTP::Supply::BadMessage.new(
+                                    reason => 'status line contains garbage',
+                                );
+                            }
+                        }
 
                         # Save the status line
                         @res[0] = $status-code.Int;
-                        @res[1].push: 'x-server-protocol' => $http-version;
-                        @res[1].push: 'x-server-status-message' => $status-message;
+                        @res[1].push: '::server-protocol' => $http-version;
+                        @res[1].push: '::server-reason-phrase' => $status-message;
 
                         $expect = Header;
                     }
@@ -165,10 +310,13 @@ multi method parse-http(Supply:D() $conn, Bool :$debug = False --> Supply:D) {
 
                         # Lines starting with whitespace are folded. Append the
                         # value to the previous header.
-                        elsif $line.starts-with(' ') {
+                        elsif $line.starts-with(' '|"\t") {
                             debug("CONT HEADER ", $line);
 
-                            # TODO Exception here?
+                            # Folding encountered too early
+                            die X::HTTP::Supply::BadMessage.new(
+                                reason => 'header folding encountered before any header was sent',
+                            ) if @res[1].elems == 0;
 
                             @res[1][*-1].value ~= $line.trim-leading;
                         }

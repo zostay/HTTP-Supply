@@ -12,10 +12,10 @@ my @tests =
         expected => ([
             200,
             [
-                x-server-protocol       => 'HTTP/1.1',
-                x-server-status-message => 'OK',
-                content-type            => 'text/plain',
-                content-length          => '14',
+                '::server-protocol'      => 'HTTP/1.1',
+                '::server-reason-phrase' => 'OK',
+                content-type             => 'text/plain',
+                content-length           => '14',
             ],
             "Hello World!\r\n",
         ],),

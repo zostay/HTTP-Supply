@@ -10,7 +10,7 @@ use HTTP::Supply::Request::Test;
 my @tests =
     {
         source   => 'http-1.0-trailing-garbage.txt',
-        quits    => %(:on(X::HTTP::Supply::Request::BadRequest)),
+        quits    => %(:on(X::HTTP::Supply::BadMessage)),
         expected => ({
             REQUEST_METHOD     => 'POST',
             REQUEST_URI        => '/index.html',
@@ -25,7 +25,7 @@ my @tests =
     },
     {
         source   => 'http-1.1-trailing-garbage.txt',
-        quits    => %(:on(X::HTTP::Supply::Request::BadRequest)),
+        quits    => %(:on(X::HTTP::Supply::BadMessage)),
         expected => ({
             REQUEST_METHOD     => 'POST',
             REQUEST_URI        => '/index.html',

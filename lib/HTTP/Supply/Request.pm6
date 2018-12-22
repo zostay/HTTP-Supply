@@ -1,6 +1,8 @@
 use v6;
 
-unit class HTTP::Supply::Request:ver<0.2.0>:auth<github:zostay>;
+unit class HTTP::Supply::Request;
+
+=begin pod
 
 =NAME HTTP::Supply::Request - A modern HTTP/1.x request parser
 
@@ -16,7 +18,7 @@ unit class HTTP::Supply::Request:ver<0.2.0>:auth<github:zostay>;
                 handle-response($conn, $res);
 
                 QUIT {
-                    when X::HTTP::Supply::Request::UnsupportedProtocol {
+                    when X::HTTP::Supply::UnsupportedProtocol {
                         $conn.print("505 HTTP Version Not Supported HTTP/1.1\r\n");
                         $conn.print("Content-Length: 26\r\n");
                         $conn.print("Content-Type: text/plain\r\n\r\n");
@@ -26,7 +28,7 @@ unit class HTTP::Supply::Request:ver<0.2.0>:auth<github:zostay>;
                         $conn.close;
                     }
 
-                    when X::HTTP::Supply::Request::BadRequest {
+                    when X::HTTP::Supply::BadMessage {
                         $conn.print("400 Bad Request HTTP/1.1\r\n");
                         $conn.print("Content-Length: " ~ .message.encode.bytes ~ \r\n");
                         $conn.print("Content-Type: text/plain\r\n\r\n");
@@ -57,25 +59,24 @@ unit class HTTP::Supply::Request:ver<0.2.0>:auth<github:zostay>;
 
 B<EXPERIMENTAL:> The API for this module is experimental and may change.
 
-This class provides a L<Supply> that is able to parse a series of request frames
-from an HTTP/1.x connection. Given a L<Supply>, it consumes binary input from
-it. It detects the request frame or frames within the stream and passes them
-back to any taps on the supply asynchronously as they arrive.
+This class parses incoming data from a connection and returns a L<Supply> that
+emits request frames as they are parsed out of the HTTP/1.x connection.  The
+connection is given as a Supply and it consumes binary input from it. It detects
+the request frame or frames within the stream and passes them back to any taps
+on the supply asynchronously as they arrive.
 
 This Supply emits partial L<P6WAPI> compatible environments for use by the
 caller. If a problem is detected in the stream, it will quit with an exception.
 
 =end DESCRIPTION
 
-=begin pod
-
 =head1 METHODS
 
-=head2 sub parse-http
+=head2 method parse-http
 
-    sub parse-http(Supply:D() :$conn, :&promise-maker) returns Supply:D
+    method parse-http(HTTP::Supply::Request: Supply:D() $conn, Bool :$debug = False) returns Supply:D
 
-The given L<Supply>, C<$conn> must emit a stream of bytes. Any other data will
+The given L<Supply>, C<$conn>, must emit a stream of bytes. Any other data will
 result in undefined behavior. The parser assumes that only binary bytes will be
 sent and makes no particular effort to verify that assumption.
 
@@ -120,12 +121,12 @@ keys.
 The following exceptions are thrown by this class while processing input, which
 will trigger the quit handlers on the Supply.
 
-=head2 X::HTTP::Supply::Request::UnsupportedProtocol
+=head2 X::HTTP::Supply::UnsupportedProtocol
 
 This exception will be thrown if the stream does not seem to be HTTP or if the
 requested HTTP version is not 1.0 or 1.1.
 
-=head2 X::HTTP::Supply::Request::BadRequest
+=head2 X::HTTP::Supply::BadMessage
 
 This exception will be thrown if the HTTP request is incorrectly framed. This
 may happen when the request does not specify its content length using a
@@ -167,24 +168,14 @@ This software is licensed under the same terms as Perl 6.
 
 =end pod
 
+use HTTP::Supply;
 use HTTP::Supply::Body;
 use HTTP::Supply::Tools;
-
-package GLOBAL::X::HTTP::Supply::Request {
-    class UnsupportedProtocol is Exception {
-        method message() { "HTTP version is not supported." }
-    }
-
-    class BadRequest is Exception {
-        has $.reason is required;
-        method message() { $!reason }
-    }
-}
 
 # I rewrote parse-request-stream and heavily modeled after
 # Cro::HTTP::RequestParser which does this exact thing very nicely.
 
-multi method parse-http(Supply:D() $conn, Bool :$debug = False --> Supply:D) {
+method parse-http(Supply:D() $conn, Bool :$debug = False --> Supply:D) {
     sub debug(*@msg) {
         note "# [{now.Rat.fmt("%.5f")}] (#$*THREAD.id()) ", |@msg if $debug
     }
@@ -236,24 +227,24 @@ multi method parse-http(Supply:D() $conn, Bool :$debug = False --> Supply:D) {
 
                         # We got more than three strings, which is not okay.
                         if @error {
-                            die X::HTTP::Supply::Request::BadRequest.new(
+                            die X::HTTP::Supply::BadMessage.new(
                                 reason => 'request line contains too many fields',
                             );
                         }
 
                         # We got just three parts, but the last is not an HTTP
                         # version we support.
-                        if $http-version ~~ none('HTTP/1.0', 'HTTP/1.1') {
+                        if ($http-version//'') eq none('HTTP/1.0', 'HTTP/1.1') {
 
                             # Looks like an HTTP we don't support
-                            if $http-version.defined && $http-version ~~ /^ 'HTTP/' <[0..9]>+ '.' <[0..9]>+ $/ {
-                                die X::HTTP::Supply::Request::UnsupportedProtocol.new.throw;
+                            if $http-version.defined && $http-version ~~ /^ 'HTTP/' <[0..9]>+ / {
+                                die X::HTTP::Supply::UnsupportedProtocol.new;
                             }
 
                             # It is other.
                             else {
-                                die X::HTTP::Supply::Request::BadRequest.new(
-                                    reason => 'trailing garbage found after request',
+                                die X::HTTP::Supply::BadMessage.new(
+                                    reason => 'request line contains garbage',
                                 );
                             }
                         }
@@ -364,10 +355,10 @@ multi method parse-http(Supply:D() $conn, Bool :$debug = False --> Supply:D) {
 
                         # Lines starting with whitespace are folded. Append the
                         # value to the previous header.
-                        elsif $line.starts-with(' ') {
+                        elsif $line.starts-with(' '|"\t") {
                             debug("CONT HEADER ", $line);
 
-                            die X::HTTP::Supply::Request::BadRequest.new(
+                            die X::HTTP::Supply::BadMessage.new(
                                 reason => 'header folding encountered before any header was sent',
                             ) without $previous-header;
 
