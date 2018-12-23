@@ -1,5 +1,10 @@
 {{$NEXT}}
 
+    * Bugfix: Previous releases did not handle trailers correctly. They were
+      being emitted with the body as a hash, but should have been emitted as a
+      array.
+    * Adds testing for response pipelines.
+
 v0.3.1	2018-12-21
 
     * Corrected missing HTTP::Supply::Request to DEPRECATED old name in the
