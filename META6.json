@@ -1,38 +1,38 @@
 {
-  "depends": [
+  "auth": "github:zostay",
+  "resources": [
     
   ],
-  "auth": "github:zostay",
+  "build-depends": [
+    
+  ],
+  "support": {
+    "source": "git://github.com/zostay/HTTP-Supply.git"
+  },
   "test-depends": [
     "Test",
     "Test::META"
   ],
-  "meta-version": "0",
-  "build-depends": [
+  "depends": [
     
   ],
-  "perl": "6.c",
   "source-url": "git://github.com/zostay/HTTP-Supply.git",
-  "provides": {
-    "HTTP::Supply": "lib/HTTP/Supply.pm6",
-    "HTTP::Supply::Request": "lib/HTTP/Supply/Request.pm6",
-    "HTTP::Request::Supply": "lib/HTTP/Request/Supply.pm6",
-    "HTTP::Supply::Response": "lib/HTTP/Supply/Response.pm6"
-  },
-  "support": {
-    "source": "git://github.com/zostay/HTTP-Supply.git"
-  },
-  "description": "A modern HTTP pipeline parser",
-  "license": "Artistic-2.0",
-  "version": "0.3.1",
-  "name": "HTTP::Supply",
   "tags": [
     
   ],
-  "resources": [
-    
-  ],
+  "provides": {
+    "HTTP::Request::Supply": "lib/HTTP/Request/Supply.pm6",
+    "HTTP::Supply::Request": "lib/HTTP/Supply/Request.pm6",
+    "HTTP::Supply::Response": "lib/HTTP/Supply/Response.pm6",
+    "HTTP::Supply": "lib/HTTP/Supply.pm6"
+  },
   "authors": [
     "Sterling Hanenkamp <hanenkamp@cpan.org>"
-  ]
+  ],
+  "license": "Artistic-2.0",
+  "name": "HTTP::Supply",
+  "description": "A modern HTTP pipeline parser",
+  "perl": "6.c",
+  "meta-version": "0",
+  "version": "0.3.2"
 }

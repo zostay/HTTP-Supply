@@ -1,4 +1,4 @@
-{{$NEXT}}
+v0.3.2	2018-12-23
 
     * Bugfix: Previous releases did not handle trailers correctly. They were
       being emitted with the body as a hash, but should have been emitted as a
