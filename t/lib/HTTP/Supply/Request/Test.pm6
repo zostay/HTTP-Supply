@@ -29,9 +29,9 @@ method run-test($envs, @expected is copy, :%quits) {
             my $input   = %env<p6w.input> :delete;
             my $content = %exp<p6w.input> :delete;
 
-            my %trailers;
+            my @trailers;
             if %exp<test.trailers>:exists {
-                %trailers = %exp<test.trailers> :delete;
+                @trailers := %exp<test.trailers> :delete;
             }
 
             @output.push: {
@@ -48,14 +48,9 @@ method run-test($envs, @expected is copy, :%quits) {
                         # note "GOT CHUNK ", $chunk;
                         given $chunk {
                             when Blob { $acc ~= $chunk }
-                            when Hash {
-                                if $chunk eqv %trailers {
-                                    @output.push: { pass 'found trailers' };
-                                }
-                                else {
-                                    @output.push: { flunk 'found trailers' };
-                                }
-                                %trailers = ();
+                            when List {
+                                self.headers-equivalent($chunk, @trailers);
+                                @trailers := ();
                             }
                             default {
                                 @output.push: { flunk 'unknown body output' };
@@ -65,7 +60,7 @@ method run-test($envs, @expected is copy, :%quits) {
                         LAST {
                             @output.push: {
                                 is $acc.decode('utf8'), $content, 'message body looks good';
-                                flunk 'trailers were not received' if %trailers;
+                                flunk 'trailers were not received' if @trailers;
                             };
 
                             done;

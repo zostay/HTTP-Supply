@@ -20,6 +20,41 @@ my @tests =
             "Hello World!\r\n",
         ],),
     ),
+    %(
+        source   => 'http-response-pipeline.txt',
+        expected => ([
+            200,
+            [
+                '::server-protocol'      => 'HTTP/1.1',
+                '::server-reason-phrase' => 'OK',
+                content-type             => 'application/json; charset=utf8',
+                content-length           => '21',
+            ],
+            qq[\{"hello":"world"}\r\n\r\n],
+        ], [
+            200,
+            [
+                '::server-protocol'      => 'HTTP/1.1',
+                '::server-reason-phrase' => 'Pretty Good',
+                content-type             => 'text/plain; charset=utf8',
+                transfer-encoding        => 'chunked',
+                trailer                  => 'Magic',
+            ],
+            "aababcabcd",
+            [
+                'magic' => 'off',
+            ],
+        ], [
+            200,
+            [
+                '::server-protocol'      => 'HTTP/1.1',
+                '::server-reason-phrase' => 'Freaking Amazing',
+                content-type             => 'text/html; charset=latin-1',
+                content-length           => '27',
+            ],
+            "<em>Neat-o Mosquito!</em>\r\n",
+        ]),
+    ),
 ;
 
 my $tester = HTTP::Supply::Response::Test.new(:@tests);

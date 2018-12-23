@@ -27,8 +27,7 @@ class Body::ChunkedEncoding is Body {
     has $.expect = Size;
     has buf8 $.acc .= new;
     has UInt $.expected-size where * > 0;
-    has Pair $!previous-header;
-    has %!trailer;
+    has @!trailer;
 
     enum LoopAction <NeedMoreData TryThisData QuitDecoding>;
 
@@ -46,7 +45,7 @@ class Body::ChunkedEncoding is Body {
             # Let the taps know we got it all
             if $action == QuitDecoding {
                 # Emit trailer if present
-                $.body-stream.emit: %!trailer if %!trailer;
+                $.body-stream.emit: @!trailer if @!trailer;
 
                 # Close the body stream
                 $.body-stream.done;
@@ -139,9 +138,9 @@ class Body::ChunkedEncoding is Body {
                 elsif $line.starts-with(' ') {
                     die X::HTTP::Supply::BadMessage.new(
                         reason => 'trailer folding encountered before any trailer was sent',
-                    ) without $!previous-header;
+                    ) unless @!trailer;
 
-                    $!previous-header.value ~= $line.trim-leading;
+                    @!trailer[*-1].value ~= $line.trim-leading;
 
                     return TryThisData;
                 }
@@ -150,21 +149,10 @@ class Body::ChunkedEncoding is Body {
                 else {
                     my ($name, $value) = $line.split(": ");
 
-                    # Setup the name for the P6WAPI environment
-                    $name = make-p6wapi-name($name);
+                    # Setup the name for emission
+                    $name .= fc;
 
-                    # Save the trailer for emitting
-                    if %!trailer{ $name } :exists {
-                        # Some trailers could be provided more than once.
-                        %!trailer{ $name } ~= ',' ~ $value;
-                    }
-                    else {
-                        # First occurrence of a trailer.
-                        %!trailer{ $name } = $value;
-                    }
-
-                    # Remember the trailer line for folded lines.
-                    $!previous-header = %!trailer{ $name } :p;
+                    @!trailer.push: $name => $value;
 
                     return TryThisData;
                 }
