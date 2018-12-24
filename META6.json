@@ -1,41 +1,41 @@
 {
-  "auth": "github:zostay",
+  "tags": [
+    
+  ],
   "resources": [
-
+    
   ],
+  "auth": "github:zostay",
+  "authors": [
+    "Sterling Hanenkamp <hanenkamp@cpan.org>"
+  ],
+  "description": "A modern HTTP pipeline parser",
   "build-depends": [
-
+    
   ],
-  "support": {
-    "source": "git://github.com/zostay/HTTP-Supply.git"
+  "source-url": "git://github.com/zostay/HTTP-Supply.git",
+  "name": "HTTP::Supply",
+  "perl": "6.c",
+  "license": "Artistic-2.0",
+  "depends": [
+    
+  ],
+  "provides": {
+    "HTTP::Supply::Body::ChunkEncoding": "lib/HTTP/Supply/Body.pm6",
+    "HTTP::Supply": "lib/HTTP/Supply.pm6",
+    "HTTP::Supply::Body::ContentLength": "lib/HTTP/Supply/Body.pm6",
+    "HTTP::Supply::Body": "lib/HTTP/Supply/Body.pm6",
+    "HTTP::Supply::Request": "lib/HTTP/Supply/Request.pm6",
+    "HTTP::Request::Supply": "lib/HTTP/Request/Supply.pm6",
+    "HTTP::Supply::Response": "lib/HTTP/Supply/Response.pm6"
   },
+  "version": "0.3.3",
   "test-depends": [
     "Test",
     "Test::META"
   ],
-  "depends": [
-
-  ],
-  "source-url": "git://github.com/zostay/HTTP-Supply.git",
-  "tags": [
-
-  ],
-  "provides": {
-    "HTTP::Request::Supply": "lib/HTTP/Request/Supply.pm6",
-    "HTTP::Supply::Body": "lib/HTTP/Supply/Body.pm6",
-    "HTTP::Supply::Body::ContentLength": "lib/HTTP/Supply/Body.pm6",
-    "HTTP::Supply::Body::ChunkEncoding": "lib/HTTP/Supply/Body.pm6",
-    "HTTP::Supply::Request": "lib/HTTP/Supply/Request.pm6",
-    "HTTP::Supply::Response": "lib/HTTP/Supply/Response.pm6",
-    "HTTP::Supply": "lib/HTTP/Supply.pm6"
+  "support": {
+    "source": "git://github.com/zostay/HTTP-Supply.git"
   },
-  "authors": [
-    "Sterling Hanenkamp <hanenkamp@cpan.org>"
-  ],
-  "license": "Artistic-2.0",
-  "name": "HTTP::Supply",
-  "description": "A modern HTTP pipeline parser",
-  "perl": "6.c",
-  "meta-version": "0",
-  "version": "0.3.2"
+  "meta-version": "0"
 }
