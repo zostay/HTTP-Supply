@@ -1,10 +1,10 @@
 {
   "auth": "github:zostay",
   "resources": [
-    
+
   ],
   "build-depends": [
-    
+
   ],
   "support": {
     "source": "git://github.com/zostay/HTTP-Supply.git"
@@ -14,14 +14,17 @@
     "Test::META"
   ],
   "depends": [
-    
+
   ],
   "source-url": "git://github.com/zostay/HTTP-Supply.git",
   "tags": [
-    
+
   ],
   "provides": {
     "HTTP::Request::Supply": "lib/HTTP/Request/Supply.pm6",
+    "HTTP::Supply::Body": "lib/HTTP/Supply/Body.pm6",
+    "HTTP::Supply::Body::ContentLength": "lib/HTTP/Supply/Body.pm6",
+    "HTTP::Supply::Body::ChunkEncoding": "lib/HTTP/Supply/Body.pm6",
     "HTTP::Supply::Request": "lib/HTTP/Supply/Request.pm6",
     "HTTP::Supply::Response": "lib/HTTP/Supply/Response.pm6",
     "HTTP::Supply": "lib/HTTP/Supply.pm6"
