@@ -1,7 +1,5 @@
 {{$NEXT}}
 
-v0.3.3	2018-12-23
-
     * Bugfix: Fixing missing provides in the META6.json
  
 v0.3.2	2018-12-23
