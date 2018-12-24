@@ -1,5 +1,7 @@
 {{$NEXT}}
 
+    * Bugfix: Fixing missing provides in the META6.json
+ 
 v0.3.2	2018-12-23
 
     * Bugfix: Previous releases did not handle trailers correctly. They were
