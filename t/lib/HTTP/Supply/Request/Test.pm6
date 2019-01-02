@@ -65,12 +65,33 @@ method run-test($envs, @expected is copy, :%quits) {
 
                             done;
                         }
+
+                        QUIT {
+                            when %quits<body> {
+                                @output.push: {
+                                    pass 'Body quit on expected error.';
+                                }
+                            }
+                            default {
+                                .note;
+                                @output.push: {
+                                    flunk 'Body quit on expected error.';
+                                }
+                            }
+                        }
                     }
                 }
                 # note "STOP CHUNKING";
             }
 
-            LAST { done }
+            LAST {
+                if %quits<on> :exists {
+                    @output.push: {
+                        flunk "Quit on expected error.";
+                    }
+                };
+                done
+            }
 
             QUIT {
                 when %quits<on> {

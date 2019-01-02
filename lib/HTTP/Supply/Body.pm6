@@ -18,8 +18,15 @@ class Body {
     }
 
     method process-bytes(Blob $buf) { ... }
-    method handle-done() { }
-    method handle-quit($error) { }
+    method handle-done() {
+        use HTTP::Supply;
+        $.body-stream.quit(
+            X::HTTP::Supply::BadMessage.new(reason => "premature end to message body")
+        ) unless $!left-over;
+    }
+    method handle-quit($error) {
+        $.body-stream.quit($error);
+    }
 }
 
 class Body::ChunkedEncoding is Body {

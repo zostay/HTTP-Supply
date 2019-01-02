@@ -24,6 +24,22 @@ my @tests =
         },),
     },
     {
+        source   => 'http-1.1-short.txt',
+        quits    => %(:body(X::HTTP::Supply::BadMessage)),
+        expected => ({
+            REQUEST_METHOD     => 'POST',
+            REQUEST_URI        => '/index.html',
+            SERVER_PROTOCOL    => 'HTTP/1.1',
+            CONTENT_TYPE       => 'application/x-www-form-urlencoded; charset=utf8',
+            CONTENT_LENGTH     => '13',
+            HTTP_AUTHORIZATION => 'Basic QWxhZGRpbjpvcGVuIHNlc2FtZQ==',
+            HTTP_REFERER       => 'http://example.com/awesome.html',
+            HTTP_CONNECTION    => 'close',
+            HTTP_USER_AGENT    => 'Mozilla/Inf',
+            'p6w.input'        => "a=1&b=2&c=\r\n",
+        },),
+    },
+    {
         source   => 'http-1.1-pipeline.txt',
         expected => ({
             REQUEST_METHOD     => 'POST',

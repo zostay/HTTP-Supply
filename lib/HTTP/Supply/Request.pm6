@@ -204,6 +204,16 @@ method parse-http(Supply:D() $conn, Bool :$debug = False --> Supply:D) {
         new-request();
 
         whenever $conn -> $chunk {
+            LAST {
+                debug("client closed the connection");
+
+                if $expect ~~ Body {
+                    $body-sink.done;
+                }
+
+                LEAVE done;
+            }
+
             # When expecting a header, add the chunk to the accumulation buffer.
             debug("RECV ", $chunk.perl);
             $acc ~= $chunk if $expect != Body;
