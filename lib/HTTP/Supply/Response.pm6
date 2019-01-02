@@ -255,7 +255,7 @@ method parse-http(Supply:D() $conn, Bool :$debug = False --> Supply:D) {
                                     HTTP::Supply::Body::ContentLength
                                 }
                                 else {
-                                    Nil
+                                    HTTP::Supply::Body::UntilDone
                                 }
 
                             debug("DECODER CLASS ", $body-decoder-class.^name);

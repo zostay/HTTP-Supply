@@ -20,6 +20,18 @@ my @tests =
             "Hello World!\r\n",
         ],),
     ),
+   %(
+        source   => 'http-response-no-length.txt',
+        expected => ([
+            200,
+            [
+                '::server-protocol'      => 'HTTP/1.1',
+                '::server-reason-phrase' => 'OK',
+                content-type             => 'text/plain',
+            ],
+            "Hello World!\r\n",
+        ],),
+    ),
     %(
         source   => 'http-response-pipeline.txt',
         expected => ([

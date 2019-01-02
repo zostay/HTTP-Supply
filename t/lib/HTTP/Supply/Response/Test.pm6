@@ -60,11 +60,32 @@ method run-test($resps, @expected is copy, :%quits) {
 
                             done;
                         }
+
+                        QUIT {
+                            when %quits<body> {
+                                @output.push: {
+                                    pass 'Body quit on expected error.';
+                                }
+                            }
+                            default {
+                                .note;
+                                @output.push: {
+                                    flunk 'Body quit on expected error.';
+                                }
+                            }
+                        }
                     }
                 }
             }
 
-            LAST { done }
+            LAST {
+                if %quits<on> :exists {
+                    @output.push: {
+                        flunk "Quit on expected error.";
+                    }
+                };
+                done
+            }
 
             QUIT {
                 when %quits<on> {

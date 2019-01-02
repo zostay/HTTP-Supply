@@ -191,3 +191,13 @@ class Body::ContentLength is Body {
     }
 }
 
+class Body::UntilDone is Body {
+    method process-bytes(Blob $buf) {
+        $.body-stream.emit: $buf;
+    }
+
+    method handle-done() {
+        $.body-stream.done;
+        $.left-over.keep(Buf.new);
+    }
+}
