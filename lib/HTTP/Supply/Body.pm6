@@ -179,7 +179,7 @@ class Body::ContentLength is Body {
         # More data received.
         else {
             $!bytes-read += $buf.bytes;
-            $.body-stream.emit: $buf;
+            $.body-stream.emit: $buf if $buf.bytes > 0;
         }
     }
 }
