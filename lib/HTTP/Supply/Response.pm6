@@ -146,7 +146,7 @@ method !make-header(@header) {
 
 method parse-http(Supply:D() $conn, Bool :$debug = False --> Supply:D) {
     sub debug(*@msg) {
-        note "# [{now.Rat.fmt("%.5f")}] (#$*THREAD.id()) ", |@msg if $debug
+        note "# Response [$*PID] [{now.Rat.fmt("%.5f")}] (#$*THREAD.id()) ", |@msg if $debug
     }
 
     supply {

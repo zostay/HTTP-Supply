@@ -177,7 +177,7 @@ use HTTP::Supply::Tools;
 
 method parse-http(Supply:D() $conn, Bool :$debug = False --> Supply:D) {
     sub debug(*@msg) {
-        note "# [{now.Rat.fmt("%.5f")}] (#$*THREAD.id()) ", |@msg if $debug
+        note "# Request [$*PID] [{now.Rat.fmt("%.5f")}] (#$*THREAD.id()) ", |@msg if $debug
     }
 
     supply {
