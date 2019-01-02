@@ -316,6 +316,7 @@ method parse-http(Supply:D() $conn, Bool :$debug = False --> Supply:D) {
 
                                 # Get the existing chunks and put them into the
                                 # body sink
+                                debug("BODY ", $acc);
                                 $body-sink.emit: $acc;
 
                                 # Emit the environment, its processing can begin
@@ -394,6 +395,7 @@ method parse-http(Supply:D() $conn, Bool :$debug = False --> Supply:D) {
 
                         # Send the chunk to the body decoder to continue
                         # decoding.
+                        debug("BODY ", $chunk);
                         $body-sink.emit: $chunk;
 
                         # The request finished and the pipeline is ready
