@@ -193,7 +193,7 @@ class Body::ContentLength is Body {
 
 class Body::UntilDone is Body {
     method process-bytes(Blob $buf) {
-        $.body-stream.emit: $buf;
+        $.body-stream.emit: $buf if $buf.bytes;
     }
 
     method handle-done() {

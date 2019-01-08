@@ -244,7 +244,7 @@ method parse-http(Supply:D() $conn, Bool :$debug = False --> Supply:D) {
                             debug("HEADER END");
 
                             # Setup the body decoder itself
-                            debug("STATUS", @res[0]);
+                            debug("STATUS ", @res[0]);
                             debug("HEAD ", @res[1].perl);
                             my $body-decoder-class = do
                                 if %header<transfer-encoding>.defined
