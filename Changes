@@ -1,4 +1,4 @@
-{{$NEXT}}
+v0.3.5	2019-01-07
 
     * We work harder not to emit 0 byte bufs in the body.
     * Responses with no Content-Length now work.
