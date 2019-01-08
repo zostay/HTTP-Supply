@@ -1,5 +1,9 @@
 {{$NEXT}}
 
+    * We work harder not to emit 0 byte bufs in the body.
+    * Responses with no Content-Length now work.
+    * A body that is too short should result in an exception.
+
 v0.3.4	2018-12-23
 
     * Bugfix: Fixing missing provides in the META6.json
