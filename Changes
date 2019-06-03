@@ -1,5 +1,8 @@
 {{$NEXT}}
 
+    * Bufix: When using IO::Socket::Async::SSL, we may get empty packets, which
+      sometimes confused the response parser.
+
 v0.3.5	2019-01-07
 
     * We work harder not to emit 0 byte bufs in the body.

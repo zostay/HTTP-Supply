@@ -193,7 +193,7 @@ method parse-http(Supply:D() $conn, Bool :$debug = False --> Supply:D) {
                         my $line = crlf-line($acc);
 
                         # We don't have a complete line yet
-                        last CHUNK_PROCESS without $line;
+                        last CHUNK_PROCESS unless $line;
                         debug("STATLINE [$line]");
 
                         # Break the line up into parts
