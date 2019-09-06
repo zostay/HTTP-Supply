@@ -321,7 +321,7 @@ method parse-http(Supply:D() $conn, Bool :$debug = False --> Supply:D) {
                                 $body-decoder.decode($body-sink.Supply);
 
                                 # Convert headers into HTTP_HEADERS
-                                %env{ make-p6wapi-name(.key) } = .value for %header;
+                                %env{ make-p6wapi-name(.key) } = val(.value) for %header;
                                 debug("ENV ", %env.perl);
 
                                 # Get the existing chunks and put them into the

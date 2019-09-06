@@ -2,6 +2,8 @@
 
     * Bufix: When using IO::Socket::Async::SSL, we may get empty packets, which
       sometimes confused the response parser.
+    * Use allomorphs for request header values. This could be considered a bug
+      fix as it makes the %env returned a better match to the P6WAPI spec.
 
 v0.3.5	2019-01-07
 
