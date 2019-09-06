@@ -1,6 +1,6 @@
 use v6;
 
-unit module HTTP::Supply:ver<0.4.0>:auth<github:zostay>;
+unit module HTTP::Supply:ver<0.4.1>:auth<github:zostay>;
 
 =begin pod
 
