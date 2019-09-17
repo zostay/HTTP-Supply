@@ -1,6 +1,9 @@
 {{$NEXT}}
 
 v0.4.1	2019-09-06
+    
+    * Bugfix: Tests were failing because allomorphs were not added to tests.
+      Oops.
 
 v0.4.0	2019-09-05
 
