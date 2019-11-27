@@ -30,7 +30,7 @@ Sterling Hanenkamp C<< <hanenkamp@cpan.org> >>
 
 Copyright 2016 Sterling Hanenkamp.
 
-This software is licensed under the same terms as Perl 6.
+This software is licensed under the same terms as Raku.
 
 =end pod
 
