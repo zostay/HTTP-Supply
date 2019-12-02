@@ -1,4 +1,4 @@
-{{$NEXT}}
+v0.5.0	2019-12-01
 
     * BREAKING: Upgrading to support v0.9.Draft of RakuWAPI, which changes the
       names of lots of things. The most important bit is that p6w.input is now
