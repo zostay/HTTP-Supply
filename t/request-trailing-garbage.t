@@ -20,7 +20,7 @@ my @tests =
             HTTP_AUTHORIZATION => 'Basic QWxhZGRpbjpvcGVuIHNlc2FtZQ==',
             HTTP_REFERER       => 'http://example.com/awesome.html',
             HTTP_USER_AGENT    => 'Mozilla/Inf',
-            'p6w.input'        => 'a=1&b=2&c=3',
+            'wapi.input'       => 'a=1&b=2&c=3',
         },),
     },
     {
@@ -36,7 +36,7 @@ my @tests =
             HTTP_REFERER       => 'http://example.com/awesome.html',
             HTTP_CONNECTION    => 'close',
             HTTP_USER_AGENT    => 'Mozilla/Inf',
-            'p6w.input'        => 'a=1&b=2&c=3',
+            'wapi.input'       => 'a=1&b=2&c=3',
         },),
     },
     ;

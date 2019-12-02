@@ -1,5 +1,9 @@
 {{$NEXT}}
 
+    * BREAKING: Upgrading to support v0.9.Draft of RakuWAPI, which changes the
+      names of lots of things. The most important bit is that p6w.input is now
+      wapi.input.
+
 v0.4.1	2019-09-06
     
     * Bugfix: Tests were failing because allomorphs were not added to tests.

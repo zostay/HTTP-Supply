@@ -26,7 +26,7 @@ sub crlf-line(Buf $buf is rw, :$encoding = 'iso-8859-1' --> Str) is export {
     $line.decode($encoding);
 }
 
-sub make-p6wapi-name($name is copy) is export {
+sub make-wapi-name($name is copy) is export {
     $name .= trans('-' => '_');
     $name = "HTTP_" ~ $name.uc;
     $name = 'CONTENT_TYPE'   if $name eq 'HTTP_CONTENT_TYPE';

@@ -65,7 +65,7 @@ connection is given as a Supply and it consumes binary input from it. It detects
 the request frame or frames within the stream and passes them back to any taps
 on the supply asynchronously as they arrive.
 
-This Supply emits partial L<P6WAPI> compatible environments for use by the
+This Supply emits partial L<RakuWAPI> compatible environments for use by the
 caller. If a problem is detected in the stream, it will quit with an exception.
 
 =end DESCRIPTION
@@ -85,7 +85,7 @@ incoming bytes are collated into HTTP frames, which are parsed to determine the
 contents of the headers. Headers are encoded into strings via ISO-8859-1 (as per
 L<RFC7230 §3.2.4|https://tools.ietf.org/html/rfc7230#section-3.2.4>).
 
-Once the headers for a given frame have been read, a partial L<P6WAPI> compatible
+Once the headers for a given frame have been read, a partial L<RakuWAPI> compatible
 environment is generated from the headers and emitted to the returned Supply.
 The environment will be filled as follows:
 
@@ -107,13 +107,13 @@ these are the only protocol versions this module currently supports.)
 
 =item The C<REQUEST_URI> will be set to the URI given in the request line.
 
-=item The C<p6w.input> variable will be set to a sane L<Supply> that emits
+=item The C<wapi.input> variable will be set to a sane L<Supply> that emits
 chunks of the body as bytes as they arrive. No attempt is made to decode these
 bytes.
 
 =back
 
-No other keys will be set. A complete P6WAPI environment must contain many other
+No other keys will be set. A complete RakuWAPI environment must contain many other
 keys.
 
 =head1 DIAGNOSTICS
@@ -148,7 +148,7 @@ well-known, and well-maintained web server in production. This is only ever
 intended as a "bare metal" application server interface.
 
 This interface is built with the intention of making it easier to build HTTP/1.0
-and HTTP/1.1 parsers for use with L<P6WAPI>. As of this writing, that
+and HTTP/1.1 parsers for use with L<RakuWAPI>. As of this writing, that
 specification is only a proposed draft, so the output of this module is
 experimental and will change as that specification changes.
 
@@ -297,9 +297,9 @@ method parse-http(Supply:D() $conn, Bool :$debug = False --> Supply:D) {
 
                             debug("DECODER CLASS ", $body-decoder-class.WHAT.^name);
 
-                            # Setup the stream we will send to the P6WAPI env
+                            # Setup the stream we will send to the RakuWAPI env
                             my $body-stream = Supplier::Preserving.new;
-                            %env<p6w.input> = $body-stream.Supply;
+                            %env<wapi.input> = $body-stream.Supply;
 
                             # If we expect a body to decode, setup the decoder
                             if $body-decoder-class ~~ HTTP::Supply::Body {
@@ -321,7 +321,7 @@ method parse-http(Supply:D() $conn, Bool :$debug = False --> Supply:D) {
                                 $body-decoder.decode($body-sink.Supply);
 
                                 # Convert headers into HTTP_HEADERS
-                                %env{ make-p6wapi-name(.key) } = val(.value) for %header;
+                                %env{ make-wapi-name(.key) } = val(.value) for %header;
                                 debug("ENV ", %env.perl);
 
                                 # Get the existing chunks and put them into the
@@ -352,7 +352,7 @@ method parse-http(Supply:D() $conn, Bool :$debug = False --> Supply:D) {
                             # No body expected. Emit and move on.
                             else {
                                 # Convert headers into HTTP_HEADERS
-                                %env{ make-p6wapi-name(.key) } = .value for %header;
+                                %env{ make-wapi-name(.key) } = .value for %header;
 
                                 # Emit the completed environment.
                                 $body-stream.done;

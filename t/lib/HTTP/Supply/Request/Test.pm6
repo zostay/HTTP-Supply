@@ -26,8 +26,8 @@ method run-test($envs, @expected is copy, :%quits) {
                     without %exp;
             };
 
-            my $input   = %env<p6w.input> :delete;
-            my $content = %exp<p6w.input> :delete;
+            my $input   = %env<wapi.input> :delete;
+            my $content = %exp<wapi.input> :delete;
 
             my @trailers;
             if %exp<test.trailers>:exists {

@@ -20,7 +20,7 @@ my @tests =
             HTTP_REFERER       => 'http://example.com/awesome.html',
             HTTP_CONNECTION    => 'close',
             HTTP_USER_AGENT    => 'Mozilla/Inf',
-            'p6w.input'        => "a=1&b=2&c=3\r\n",
+            'wapi.input'       => "a=1&b=2&c=3\r\n",
         },),
     },
     {
@@ -34,7 +34,7 @@ my @tests =
             HTTP_AUTHORIZATION => 'Basic QWxhZGRpbjpvcGVuIHNlc2FtZQ==',
             HTTP_REFERER       => 'http://example.com/awesome.html',
             HTTP_USER_AGENT    => 'Mozilla/Inf',
-            'p6w.input'        => "a=1&b=2&c=3\r\n",
+            'wapi.input'       => "a=1&b=2&c=3\r\n",
         },),
     },
     {
@@ -49,7 +49,7 @@ my @tests =
             HTTP_REFERER       => 'http://example.com/awesome.html',
             HTTP_USER_AGENT    => 'Mozilla/Inf',
             HTTP_CONNECTION    => 'Keep-Alive',
-            'p6w.input'        => "a=1&b=2&c=3\r\n",
+            'wapi.input'       => "a=1&b=2&c=3\r\n",
         },),
     },
     {
@@ -65,7 +65,7 @@ my @tests =
             HTTP_REFERER       => 'http://example.com/awesome.html',
             HTTP_CONNECTION    => 'keep-alive',
             HTTP_USER_AGENT    => 'Mozilla/Inf',
-            'p6w.input'        => "a=1&b=2&c=3\r\n\r\n",
+            'wapi.input'       => "a=1&b=2&c=3\r\n\r\n",
         }, {
            REQUEST_METHOD     => 'GET',
            REQUEST_URI        => 'http://example.com/image.png',
@@ -77,7 +77,7 @@ my @tests =
            HTTP_REFERER       => 'http://example.com/index.html',
            HTTP_USER_AGENT    => 'Mozilla/Inf',
            HTTP_CONNECTION    => 'keep-alive',
-           'p6w.input'        => '',
+           'wapi.input'       => '',
        }, {
            REQUEST_METHOD     => 'GET',
            REQUEST_URI        => 'http://example.com/main.css',
@@ -87,7 +87,7 @@ my @tests =
            HTTP_ACCEPT        => 'text/css',
            HTTP_USER_AGENT    => 'Mozilla/Inf',
            HTTP_REFERER       => 'http://example.com/index.html',
-           'p6w.input'        => '',
+           'wapi.input'       => '',
         }),
     },
 ;

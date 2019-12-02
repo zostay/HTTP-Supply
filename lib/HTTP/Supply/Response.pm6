@@ -60,7 +60,7 @@ emits a response for each HTTP/1.x response frame parsed from the incoming data.
 Each frame is returned as it arrives asynchronously.
 
 
-This Supply emits an extended L<P6WAPI> response for use by the caller. If a
+This Supply emits an extended L<RakuWAPI> response for use by the caller. If a
 problem is detected in the stream, it will quit with an exception.
 
 =end DESCRIPTION
@@ -80,7 +80,7 @@ from the input supply. The response will be emitted as soon as the header has
 been read. The response includes a supply containing the body, which will be
 emitted as more binary bytes as it arrives.
 
-The response is emitted as an extended L<P6WAPI> response. It will be a
+The response is emitted as an extended L<RakuWAPI> response. It will be a
 L<Positional> object with three elements:
 
 =over
@@ -260,7 +260,7 @@ method parse-http(Supply:D() $conn, Bool :$debug = False --> Supply:D) {
 
                             debug("DECODER CLASS ", $body-decoder-class.^name);
 
-                            # Setup the stream we will send to the P6WAPI response
+                            # Setup the stream we will send to the RakuWAPI response
                             my $body-stream = Supplier::Preserving.new;
                             @res[2] = $body-stream.Supply;
 
